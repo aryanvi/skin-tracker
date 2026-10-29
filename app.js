@@ -89,17 +89,27 @@ window.addEventListener("resize", () => {
 
 // ---------- Short messages ----------
 
+// Shows a short message. Optionally with a button: action = { label, run }
 let toastTimer = 0;
-function toast(message) {
+let toastRun = null;
+function toast(message, action = null) {
   const el = $("toast");
-  el.textContent = message;
+  $("toast-text").textContent = message;
+  $("toast-action").hidden = !action;
+  if (action) $("toast-action").textContent = action.label;
+  toastRun = action && action.run;
   el.hidden = false;
   el.style.animation = "none"; // restart the slide-in
   el.offsetHeight;
   el.style.animation = "";
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), 2600);
+  toastTimer = setTimeout(() => (el.hidden = true), action ? 4500 : 2600);
 }
+
+$("toast-action").addEventListener("click", () => {
+  $("toast").hidden = true;
+  if (toastRun) toastRun();
+});
 
 function render() {
   const today = todayKey();
@@ -286,39 +296,67 @@ function renderStreak() {
 
 // ---------- Taking a photo: review first, then save ----------
 
-// All camera inputs (Today button, nav button and Retake) work the same way
+// Which day the next picked photo is for. null = today.
+// Set when you choose "Add photo" on a clear day in the Calendar.
+let nextPhotoDate = null;
+
+// All photo inputs (Today button, Calendar + button and Retake) work the same way.
+// On a phone they offer Take Photo or Photo Library.
 for (const input of document.querySelectorAll(".camera-input")) {
   input.addEventListener("change", async () => {
     const file = input.files[0];
     input.value = ""; // so picking the same file again still works
-    if (!file) return;
+    const isRetake = !!input.closest("#review");
+    if (!file) {
+      if (!isRetake) nextPhotoDate = null;
+      return;
+    }
 
     let blob;
     try {
       blob = await shrinkPhoto(file);
     } catch {
-      toast("That photo couldn't be opened. Try taking it again.");
+      toast("That photo couldn't be opened. Try another one.");
       return;
     }
     discardPending();
     pendingPhoto = { blob, url: URL.createObjectURL(blob) };
 
-    $("review-date").textContent = fromKey(todayKey()).toLocaleDateString(undefined, {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    });
+    // A retake keeps the date already chosen; a new photo starts on today
+    // (or the Calendar day it was added from)
+    const dateInput = $("review-date");
+    dateInput.max = todayKey();
+    if (!isRetake) {
+      dateInput.value = nextPhotoDate || todayKey();
+      nextPhotoDate = null;
+    }
     $("review-photo").src = pendingPhoto.url;
     if (!$("review").open) $("review").showModal();
   });
 }
 
-// Save adds the photo to today. Earlier photos from today are kept.
+// Save adds the photo to the chosen day. Photos already on that day are kept.
 $("review-save").addEventListener("click", async () => {
   if (!pendingPhoto) return;
-  const photo = { date: todayKey(), photo: pendingPhoto.blob, takenAt: Date.now() };
+  const today = todayKey();
+  let date = $("review-date").value || today;
+  if (date > today) date = today; // no photos in the future
+
+  // A photo for an earlier day doesn't have a real time of day, so it's
+  // filed at midday and the viewer leaves the time off
+  const photo = { date, photo: pendingPhoto.blob, takenAt: Date.now() };
+  if (date !== today) {
+    photo.takenAt = fromKey(date).getTime() + 12 * 60 * 60 * 1000 + (Date.now() % 60000);
+    photo.timeUnknown = true;
+  }
+
   try {
     photo.id = await addPhoto(photo);
+    // A photo from before tracking started moves the start back to that day
+    if (date < startDate) {
+      await setMeta("startDate", date);
+      startDate = date;
+    }
   } catch {
     toast("Couldn't save the photo. Your phone may be low on space.");
     return; // keep the review open so the photo isn't lost
@@ -329,6 +367,10 @@ $("review-save").addEventListener("click", async () => {
 
   $("review").close();
   render();
+  if (date !== today) {
+    const label = fromKey(date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    toast(`Added to ${label}`);
+  }
 });
 
 $("review-cancel").addEventListener("click", () => $("review").close());
@@ -501,7 +543,13 @@ function renderMonth(year, month, today, withArrows = false) {
       cell.setAttribute("aria-label", `${day}: clear`);
       cell.addEventListener("click", () => {
         const label = fromKey(key).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-        toast(`${label} · Clear day`);
+        toast(`${label} · Clear day`, {
+          label: "Add photo",
+          run: () => {
+            nextPhotoDate = key;
+            $("calendar-camera").click();
+          },
+        });
       });
     }
     if (key === today) cell.classList.add("today");
@@ -583,13 +631,16 @@ function showViewerPhoto() {
   const photos = days.get(viewerDate);
   const photo = photos[viewerIndex];
   const d = fromKey(viewerDate);
-  const time = new Date(photo.takenAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const time = photo.timeUnknown
+    ? ""
+    : " · " + new Date(photo.takenAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
   $("viewer-day").textContent = d.getDate();
   $("viewer-month").textContent =
     d.toLocaleDateString(undefined, { weekday: "short" }) + " · " +
-    d.toLocaleDateString(undefined, { month: "long", year: "numeric" }) + " · " + time;
+    d.toLocaleDateString(undefined, { month: "long", year: "numeric" }) + time;
   $("viewer-photo").src = photo.url;
+  $("focus-photo").src = photo.url; // keeps full screen in step when swiping
 
   $("viewer-pager").hidden = photos.length < 2;
   $("viewer-count").textContent = `${viewerIndex + 1} of ${photos.length}`;
@@ -604,27 +655,61 @@ function stepViewer(step) {
   if (next < 0 || next >= days.get(viewerDate).length) return;
   viewerIndex = next;
   showViewerPhoto();
-  const photo = $("viewer-photo");
-  photo.style.setProperty("--dir", step);
-  photo.classList.remove("slide");
-  photo.offsetHeight; // restart the animation
-  photo.classList.add("slide");
+  for (const photo of [$("viewer-photo"), $("focus-photo")]) {
+    photo.style.setProperty("--dir", step);
+    photo.classList.remove("slide");
+    photo.offsetHeight; // restart the animation
+    photo.classList.add("slide");
+  }
 }
 
 $("viewer-prev").addEventListener("click", () => stepViewer(-1));
 $("viewer-next").addEventListener("click", () => stepViewer(1));
 
-// Swipe left or right on the photo to flip through the day's photos
-let swipeStartX = null;
-$("viewer-photo").addEventListener("pointerdown", (event) => (swipeStartX = event.clientX));
-$("viewer-photo").addEventListener("pointerup", (event) => {
-  if (swipeStartX === null) return;
-  const distance = event.clientX - swipeStartX;
-  swipeStartX = null;
-  if (Math.abs(distance) > 40) stepViewer(distance < 0 ? 1 : -1);
-});
-$("viewer-photo").addEventListener("pointercancel", () => (swipeStartX = null));
+// Tells a tap apart from a sideways swipe on an element.
+// A swipe calls onSwipe(1) for next or onSwipe(-1) for previous.
+function onTapOrSwipe(element, onTap, onSwipe) {
+  let startX = null;
+  let startY = 0;
+  let moved = false;
+  element.addEventListener("pointerdown", (event) => {
+    startX = event.clientX;
+    startY = event.clientY;
+    moved = false;
+  });
+  element.addEventListener("pointerup", (event) => {
+    if (startX === null) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    startX = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      moved = true;
+      onSwipe(dx < 0 ? 1 : -1);
+    } else if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      moved = true;
+    }
+  });
+  element.addEventListener("pointercancel", () => {
+    startX = null;
+    moved = true;
+  });
+  // Act on the click (not pointerup), so the click can't land on whatever is underneath
+  element.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (moved) {
+      moved = false;
+      return;
+    }
+    onTap();
+  });
+}
+
+// Viewer photo: tap for full screen, swipe for the day's other photos
+onTapOrSwipe($("viewer-photo"), () => $("focus").showModal(), stepViewer);
 $("viewer-photo").draggable = false;
+
+// Full screen: tap anywhere to go back, swipe for the day's other photos
+onTapOrSwipe($("focus"), () => $("focus").close(), stepViewer);
 
 // Tapping the dark area outside the photo closes it
 $("viewer").addEventListener("click", (event) => {

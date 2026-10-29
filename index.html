@@ -36,11 +36,11 @@
         <a class="tile" href="#calendar"><span class="micro">Breakouts this month</span><strong id="tile-breakouts">0</strong></a>
       </div>
 
-      <!-- On a phone, capture="user" opens the front (selfie) camera -->
+      <!-- On a phone this offers Take Photo or Photo Library -->
       <label class="button primary capture" tabindex="0" role="button">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
         <span id="camera-label">Log a breakout</span>
-        <input class="camera-input" type="file" accept="image/*" capture="user" hidden>
+        <input class="camera-input" type="file" accept="image/*" hidden>
       </label>
 
       <p class="footnote">Photos are saved only on this phone. Nothing is uploaded.</p>
@@ -51,7 +51,14 @@
   <div id="screen-calendar" class="screen" hidden>
     <header class="page-head">
       <p class="micro" id="since-label"></p>
-      <h1>Calendar</h1>
+      <div class="title-row">
+        <h1>Calendar</h1>
+        <!-- Add a photo from the Calendar (camera or photo library) -->
+        <label class="add-photo" tabindex="0" role="button" aria-label="Add a photo">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <input class="camera-input" id="calendar-camera" type="file" accept="image/*" hidden>
+        </label>
+      </div>
       <!-- Notion-style view tabs, with the month range picker on the right -->
       <div class="view-tabs">
         <div role="tablist" aria-label="Calendar view">
@@ -93,17 +100,26 @@
 
   <!-- After taking a photo: look at it, then retake or save -->
   <dialog id="review" class="sheet-dialog">
-    <p class="micro" id="review-date"></p>
+    <!-- Which day the photo belongs to; change it for older photos from your library -->
+    <label class="date-field">
+      <span class="micro">Date</span>
+      <input type="date" id="review-date">
+    </label>
     <h2>Keep this photo?</h2>
     <img id="review-photo" class="photo" alt="Photo you just took">
     <div class="dialog-buttons">
       <label class="button secondary" tabindex="0" role="button">
-        Retake
-        <input class="camera-input" type="file" accept="image/*" capture="user" hidden>
+        Change
+        <input class="camera-input" type="file" accept="image/*" hidden>
       </label>
       <button id="review-save" class="button primary" autofocus>Save</button>
     </div>
     <button id="review-cancel" class="text-button">Cancel</button>
+  </dialog>
+
+  <!-- Full-screen photo with no buttons: tap to close, swipe for the next one -->
+  <dialog id="focus" class="focus-dialog" aria-label="Photo, full screen">
+    <img id="focus-photo" alt="Breakout photo, full screen" draggable="false">
   </dialog>
 
   <!-- Viewing a saved day's photo -->
@@ -132,7 +148,10 @@
   </dialog>
 
   <!-- Short messages, e.g. when a photo can't be opened -->
-  <div class="toast" id="toast" role="status" hidden></div>
+  <div class="toast" id="toast" role="status" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-action" hidden></button>
+  </div>
 
   <script src="dates.js"></script>
   <script src="db.js"></script>

@@ -985,3 +985,122 @@ a.tile {
 .photo-card {
   touch-action: pan-y; /* sideways swipes go to the photo, up/down still scrolls */
 }
+
+/* ---------- Adding and enlarging photos ---------- */
+
+/* Calendar title with the black + button on the right */
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.add-photo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+  transition: transform .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.add-photo:active {
+  transform: scale(.92);
+}
+
+/* Review: which day the photo belongs to */
+.date-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1) var(--s1) var(--s1) var(--s3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.date-field input {
+  padding: var(--s1) var(--s2);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px; /* 16px stops iPhone zooming in on tap */
+}
+
+/* Full-screen photo: just the photo, large, on a dark blurred background */
+.focus-dialog {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: calc(env(safe-area-inset-top) + var(--s4)) var(--s4) calc(env(safe-area-inset-bottom) + var(--s4));
+  border: none;
+  background: transparent;
+  touch-action: pan-y;
+}
+
+.focus-dialog[open] {
+  display: grid;
+  place-items: center;
+  animation: focus-in .3s cubic-bezier(.2, .9, .3, 1);
+}
+
+.focus-dialog::backdrop {
+  background: rgba(10, 10, 10, .9);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+#focus-photo {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-card);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#focus-photo.slide {
+  animation: photo-in .25s ease-out;
+}
+
+@keyframes focus-in {
+  from { opacity: 0; transform: scale(.92); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The viewer photo hints that it can be tapped */
+#viewer-photo {
+  cursor: zoom-in;
+}
+
+/* Message with an action, e.g. "Clear day  Add photo" */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  white-space: nowrap;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+#toast-action {
+  padding: var(--s1) var(--s3);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
