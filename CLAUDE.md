@@ -21,12 +21,13 @@ Option B (breakout days only): photos are taken only on breakout days (any numbe
 
 ## Project layout
 - `index.html`, `style.css`: page and styles
-- `app.js`: screen logic (streak, capture, calendar, viewer). There are two screens, Today and Calendar, chosen by the URL hash (`#today`, `#calendar`). The floating nav bar is a black pill with only Today and Calendar text labels, and a white pill slides to the active one; there is no camera button in the nav. The Calendar screen is left-aligned and Notion-style: view tabs Photos | Lines (underline on the active tab, remembered in localStorage), a "Month ⌄" picker on the right (Month / All months, a native select under a text label; it resets to Month each time the screen opens), and in Month mode a toolbar with the month on the left and Today ‹ › on the right.
+- `app.js`: screen logic (streak, capture, calendar, viewer). There are two screens, Today and Calendar, chosen by the URL hash (`#today`, `#calendar`). The floating nav bar is a frosted-glass pill (soft grey tint plus backdrop blur) with only Today and Calendar text labels. A solid white pill slides to the active one and resizes to fit its label (`placeThumb()` sets `--thumb-x` and `--thumb-w`). There is no camera button in the nav. The Calendar screen is left-aligned and Notion-style: view tabs Photos | Lines (underline on the active tab, remembered in localStorage), a "Month ⌄" picker on the right (Month / All months, a native select under a text label; it resets to Month each time the screen opens), and in Month mode a toolbar with the month on the left and Today ‹ › on the right.
 - `db.js`: IndexedDB storage, version 2. `photos` (auto id, indexed by `date`) allows any number of photos per day; `meta` holds `startDate`. The old v1 `entries` store (one photo per day) is kept untouched as a backup. Remove it in v3 only after export/import exists. The version history is at the top of the file.
 - `dates.js`: date helpers and streak maths; it must stay loadable in Node for tests
 - `tests/`: `node --test` tests for `dates.js`
 - `fonts/`: bundled Instrument Serif 400 (headings) and Inconsolata 500 (body), with their OFL licences
 - Design tokens live at the top of `style.css` (palette v2 from PRD §7). Status colours: clear = `--blue`, breakout = `--orange`.
+- Spacing: use only the scale tokens `--s1`…`--s7` (4, 8, 12, 16, 24, 32, 48px) for margin, padding and gap, and `--gutter` (20px) for screen edges. No raw pixel spacing.
 - `references/`: design reference boards, kept out of git (other people's work)
 
 ## Commands

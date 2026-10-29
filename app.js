@@ -51,7 +51,7 @@ function showScreen() {
     if (tab.dataset.screen === name) tab.setAttribute("aria-current", "page");
     else tab.removeAttribute("aria-current");
   }
-  $("tabbar").dataset.active = name; // slides the white pill
+  placeThumb();
   // Opening the calendar always starts on this month
   if (name === "calendar") {
     calendarRange = "month";
@@ -62,6 +62,23 @@ function showScreen() {
 }
 
 window.addEventListener("hashchange", showScreen);
+
+// Moves the white pill under the open screen's label and sizes it to fit
+function placeThumb() {
+  const bar = $("tabbar");
+  const active = bar.querySelector(".tab[aria-current]");
+  if (!active) return;
+  bar.style.setProperty("--thumb-x", `${active.offsetLeft}px`);
+  bar.style.setProperty("--thumb-w", `${active.offsetWidth}px`);
+}
+
+// Labels change width once the font loads, so measure again then.
+// After that first placement, turn on the sliding animation.
+document.fonts.ready.then(() => {
+  placeThumb();
+  requestAnimationFrame(() => $("tabbar").classList.add("ready"));
+});
+window.addEventListener("resize", placeThumb);
 
 function render() {
   const today = todayKey();
