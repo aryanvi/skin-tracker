@@ -3,6 +3,8 @@
 let startDate; // the first day the app was used, e.g. "2026-10-29"
 let entries = new Map(); // "2026-10-29" -> { date, photo, takenAt, url }
 let calendarView = loadCalendarView(); // "photos" or "lines"
+let calendarRange = "month"; // "month" (default) or "all"
+let shownMonth = null; // in "month" mode: { year, month }, starts at this month
 let pendingPhoto = null; // a photo taken but not saved yet: { blob, url }
 
 const $ = (id) => document.getElementById(id);
@@ -42,6 +44,12 @@ function showScreen() {
   for (const tab of document.querySelectorAll(".tab")) {
     if (tab.dataset.screen === name) tab.setAttribute("aria-current", "page");
     else tab.removeAttribute("aria-current");
+  }
+  // Opening the calendar always starts on this month
+  if (name === "calendar") {
+    calendarRange = "month";
+    shownMonth = null;
+    if (startDate) renderCalendar();
   }
   window.scrollTo(0, 0);
 }
@@ -184,7 +192,7 @@ function shrinkPhoto(file, maxSize = 1200) {
 
 // ---------- Calendar ----------
 
-// Every month since tracking started, newest at the top
+// One month with arrows, or every month since tracking started (newest at the top)
 function renderCalendar() {
   const today = todayKey();
   const now = fromKey(today);
@@ -193,8 +201,11 @@ function renderCalendar() {
   $("since-label").textContent =
     "Since " + start.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
 
-  for (const button of document.querySelectorAll(".segmented button")) {
+  for (const button of document.querySelectorAll("[data-view]")) {
     button.setAttribute("aria-pressed", button.dataset.view === calendarView);
+  }
+  for (const button of document.querySelectorAll("[data-range]")) {
+    button.setAttribute("aria-pressed", button.dataset.range === calendarRange);
   }
 
   $("legend").innerHTML =
@@ -205,6 +216,12 @@ function renderCalendar() {
   const months = $("months");
   months.className = calendarView;
   months.innerHTML = "";
+
+  if (calendarRange === "month") {
+    if (!shownMonth) shownMonth = { year: now.getFullYear(), month: now.getMonth() };
+    months.appendChild(renderMonth(shownMonth.year, shownMonth.month, today, true));
+    return;
+  }
 
   let year = now.getFullYear();
   let month = now.getMonth();
@@ -218,17 +235,26 @@ function renderCalendar() {
   }
 }
 
-function renderMonth(year, month, today) {
+function renderMonth(year, month, today, withArrows = false) {
   const section = document.createElement("section");
   section.className = "month";
 
   const counts = monthCounts(year, month, startDate, entries, today);
   const title = new Date(year, month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const summary = `${counts.breakouts} breakout${counts.breakouts === 1 ? "" : "s"} · ${counts.clear} clear`;
+  const head = withArrows
+    ? `<div class="month-head with-arrows">
+        <button class="nav prev" aria-label="Previous month">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div><h2>${title}</h2><span class="micro">${summary}</span></div>
+        <button class="nav next" aria-label="Next month">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>`
+    : `<div class="month-head"><h2>${title}</h2><span class="micro">${summary}</span></div>`;
   section.innerHTML = `
-    <div class="month-head">
-      <h2>${title}</h2>
-      <span class="micro">${counts.breakouts} breakout${counts.breakouts === 1 ? "" : "s"} · ${counts.clear} clear</span>
-    </div>
+    ${head}
     <div class="cal-grid weekdays micro" aria-hidden="true">
       <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
     </div>`;
@@ -276,11 +302,37 @@ function renderMonth(year, month, today) {
   }
 
   section.appendChild(grid);
+
+  if (withArrows) {
+    // Don't go before the month tracking started or past this month
+    const monthKey = toKey(new Date(year, month, 1)).slice(0, 7);
+    const prev = section.querySelector(".prev");
+    const next = section.querySelector(".next");
+    prev.disabled = monthKey <= startDate.slice(0, 7);
+    next.disabled = monthKey >= today.slice(0, 7);
+    prev.addEventListener("click", () => moveMonth(-1));
+    next.addEventListener("click", () => moveMonth(1));
+  }
+
   return section;
 }
 
+function moveMonth(step) {
+  const d = new Date(shownMonth.year, shownMonth.month + step, 1);
+  shownMonth = { year: d.getFullYear(), month: d.getMonth() };
+  renderCalendar();
+}
+
+// Month | All switch. Not remembered: the calendar always opens on one month.
+for (const button of document.querySelectorAll("[data-range]")) {
+  button.addEventListener("click", () => {
+    calendarRange = button.dataset.range;
+    renderCalendar();
+  });
+}
+
 // Photos | Lines switch. The choice is remembered on this phone.
-for (const button of document.querySelectorAll(".segmented button")) {
+for (const button of document.querySelectorAll("[data-view]")) {
   button.addEventListener("click", () => {
     calendarView = button.dataset.view;
     try {

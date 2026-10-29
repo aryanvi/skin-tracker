@@ -370,6 +370,58 @@ p {
   color: #fff;
 }
 
+/* Smaller, quieter switch under the main one */
+.segmented.small {
+  display: flex;
+  width: fit-content;
+  margin: 10px auto 0;
+  padding: 3px;
+  background: none;
+  border: 1px solid var(--surface-2);
+}
+
+.segmented.small button {
+  min-width: 72px;
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+.segmented.small button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+/* One-month mode: arrows either side of the month name */
+.month-head.with-arrows {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  text-align: center;
+}
+
+.month-head.with-arrows .micro {
+  display: block;
+  margin-top: 2px;
+}
+
+button.nav {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+button.nav:disabled {
+  opacity: .3;
+  cursor: default;
+}
+
 .month {
   margin-top: 28px;
 }
