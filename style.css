@@ -230,9 +230,9 @@ p {
 /* Which day is in the spot; tap it to see that day's photos */
 .strip-caption {
   display: block;
-  align-self: flex-end; /* lines up on the right, under today */
+  align-self: center;
   min-height: 32px;
-  margin: var(--s2) calc(var(--s3) * -1) 0 0; /* text ends at the page edge */
+  margin-top: var(--s2);
   padding: var(--s2) var(--s3);
   border: none;
   border-radius: var(--radius-pill);
@@ -1103,4 +1103,38 @@ a.tile {
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+}
+
+/* ---------- Backup ---------- */
+
+/* "Backup" link at the end of the Today footnote */
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.backup-note {
+  margin: 0 0 var(--s3);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.backup-dialog .micro {
+  margin-bottom: var(--s4);
+}
+
+.backup-dialog .button {
+  width: 100%;
+  margin-top: var(--s2);
+}
+
+.backup-dialog .button:disabled {
+  opacity: .6;
 }

@@ -24,7 +24,9 @@ const SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  // "reload" skips the browser's own cache, so the saved copy is the newest version
+  const requests = SHELL.map((url) => new Request(url, { cache: "reload" }));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(requests)));
   self.skipWaiting();
 });
 
@@ -38,7 +40,8 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || new URL(request.url).origin !== location.origin) return;
 
   event.respondWith(
-    fetch(request)
+    // "no-cache" checks with the website each time, so a push shows up straight away
+    fetch(request, { cache: "no-cache" })
       .then((response) => {
         if (response.ok) {
           const copy = response.clone();
@@ -46,6 +49,8 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(request, { ignoreSearch: true }))
+      // Look only in our own copy: other projects on the same website
+      // (e.g. aryanvi.github.io/…) can have saved copies of their own
+      .catch(() => caches.open(CACHE).then((cache) => cache.match(request, { ignoreSearch: true })))
   );
 });

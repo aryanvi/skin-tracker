@@ -50,7 +50,10 @@
         <input class="camera-input" type="file" accept="image/*" hidden>
       </label>
 
-      <p class="footnote">Photos are saved only on this phone. Nothing is uploaded.</p>
+      <p class="footnote">
+        Photos are saved only on this phone. Nothing is uploaded.
+        <button class="link-button" id="open-backup">Backup</button>
+      </p>
     </main>
   </div>
 
@@ -152,6 +155,22 @@
       <button id="viewer-delete" class="button quiet">Delete</button>
       <button id="viewer-close" class="button primary" autofocus>Close</button>
     </div>
+  </dialog>
+
+  <!-- Backup: save everything to one file, or bring a saved file back -->
+  <dialog id="backup" class="sheet-dialog backup-dialog">
+    <h2>Backup</h2>
+    <p class="backup-note">
+      Your photos live only on this phone. If you clear Safari's website data or
+      remove the app, they're gone, unless you've saved a backup file.
+    </p>
+    <p class="micro" id="backup-last"></p>
+    <button id="backup-export" class="button primary">Save a backup</button>
+    <label class="button secondary" tabindex="0" role="button">
+      Restore from a backup
+      <input id="backup-import" type="file" accept=".zip,application/zip" hidden>
+    </label>
+    <button id="backup-close" class="text-button">Close</button>
   </dialog>
 
   <!-- Short messages, e.g. when a photo can't be opened -->

@@ -217,8 +217,8 @@ function stopGlide() {
 // If you touch the strip mid-glide, your finger wins
 $("day-strip").addEventListener("pointerdown", stopGlide, { passive: true });
 
-// Grows the day in the right-hand spot and steps the others down in size and
-// strength the further left they are, then updates the caption.
+// Grows the day in the right-hand spot (the others stay small and faint),
+// then updates the caption.
 // Runs on every scroll frame, which is what makes the swipe feel alive.
 function updateStrip() {
   const strip = $("day-strip");
@@ -234,8 +234,9 @@ function updateStrip() {
   for (const button of strip.querySelectorAll(".strip-day")) {
     const li = button.parentElement;
     const distance = Math.abs(li.offsetLeft + li.offsetWidth / 2 - spot);
-    // Gentle falloff over ~6 days, squared so the step down is strongest near the spot
-    const t = Math.max(0, 1 - distance / (li.offsetWidth * 6.5)) ** 2;
+    // Only the day in the spot grows; it shrinks back over one day of swiping,
+    // so the rest of the row stays the same size and in a straight line
+    const t = Math.max(0, 1 - distance / li.offsetWidth);
     button.style.setProperty("--t", t.toFixed(3));
     if (t > nearestT) {
       nearestT = t;
@@ -719,14 +720,17 @@ $("viewer-photo").draggable = false;
 // Full screen: tap anywhere to go back, swipe for the day's other photos
 onTapOrSwipe($("focus"), () => $("focus").close(), stepViewer);
 
-// Tapping the dark area outside the photo closes it
-$("viewer").addEventListener("click", (event) => {
-  const box = $("viewer").getBoundingClientRect();
-  const outside =
-    event.clientX < box.left || event.clientX > box.right ||
-    event.clientY < box.top || event.clientY > box.bottom;
-  if (outside) $("viewer").close();
-});
+// Tapping the dark area outside a pop-up closes it
+function closeOnOutsideTap(dialog) {
+  dialog.addEventListener("click", (event) => {
+    const box = dialog.getBoundingClientRect();
+    const outside =
+      event.clientX < box.left || event.clientX > box.right ||
+      event.clientY < box.top || event.clientY > box.bottom;
+    if (outside) dialog.close();
+  });
+}
+closeOnOutsideTap($("viewer"));
 
 function disarmDelete() {
   $("viewer-delete").textContent = "Delete";
@@ -763,6 +767,151 @@ $("viewer-delete").addEventListener("click", async () => {
     showViewerPhoto();
   }
   render();
+});
+
+// ---------- Backup ----------
+// A backup is one zip file made on the phone: data.json (dates and times)
+// plus every photo. Nothing is uploaded; you choose where the file goes.
+
+let readyBackup = null; // a finished backup file waiting for a second tap (see below)
+
+$("open-backup").addEventListener("click", async () => {
+  readyBackup = null;
+  $("backup-export").textContent = "Save a backup";
+  const last = await getMeta("lastBackup");
+  $("backup-last").textContent = last
+    ? `Last backup: ${new Date(last).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`
+    : "No backup yet";
+  $("backup").showModal();
+});
+
+$("backup-close").addEventListener("click", () => $("backup").close());
+closeOnOutsideTap($("backup"));
+
+async function makeBackupFile() {
+  const encoder = new TextEncoder();
+  const photos = [];
+  const files = [];
+  for (const date of [...days.keys()].sort()) {
+    const list = days.get(date);
+    for (let i = 0; i < list.length; i++) {
+      const { photo, takenAt, timeUnknown } = list[i];
+      const extension = { "image/png": "png", "image/webp": "webp" }[photo.type] || "jpg";
+      const file = `photos/${date}_${i + 1}.${extension}`;
+      photos.push({ file, date, takenAt, timeUnknown: !!timeUnknown, type: photo.type || "image/jpeg" });
+      files.push({ name: file, bytes: new Uint8Array(await photo.arrayBuffer()) });
+    }
+  }
+  const data = { app: "skin-tracker", version: 1, exportedAt: Date.now(), startDate, photos };
+  files.unshift({ name: "data.json", bytes: encoder.encode(JSON.stringify(data, null, 2)) });
+  return new File([makeZip(files)], `skin-tracker-backup-${todayKey()}.zip`, { type: "application/zip" });
+}
+
+// On iPhone this opens the Share sheet (choose "Save to Files").
+// Elsewhere the file downloads.
+async function handOver(file) {
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    await navigator.share({ files: [file] });
+  } else {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  await setMeta("lastBackup", Date.now());
+  $("backup").close();
+  toast("Backup saved");
+}
+
+$("backup-export").addEventListener("click", async () => {
+  const button = $("backup-export");
+  try {
+    if (!readyBackup) {
+      button.disabled = true;
+      button.textContent = "Preparing…";
+      readyBackup = await makeBackupFile();
+    }
+    await handOver(readyBackup);
+    readyBackup = null;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      // You closed the Share sheet: nothing saved, try again whenever
+    } else if (error.name === "NotAllowedError" && readyBackup) {
+      // Phones only open the Share sheet straight after a tap, and building
+      // a big backup takes a moment, so ask for one more tap
+      button.textContent = "Ready. Tap to save";
+      return;
+    } else {
+      toast("Couldn't make the backup. Please try again.");
+    }
+    readyBackup = null;
+  } finally {
+    button.disabled = false;
+    if (!readyBackup) button.textContent = "Save a backup";
+  }
+});
+
+// Restoring adds photos and never removes any. A photo that's already here
+// (same day and time) is skipped, so restoring twice is harmless.
+$("backup-import").addEventListener("change", async (event) => {
+  const input = event.target;
+  const file = input.files[0];
+  input.value = ""; // so the same file can be picked again
+  if (!file) return;
+
+  let data;
+  let contents;
+  try {
+    const entries = readZip(new Uint8Array(await file.arrayBuffer()));
+    contents = new Map(entries.map((entry) => [entry.name, entry.bytes]));
+    data = JSON.parse(new TextDecoder().decode(contents.get("data.json")));
+    if (data.app !== "skin-tracker" || !Array.isArray(data.photos)) throw new Error("not a backup");
+  } catch {
+    toast("That file isn't a Skin Tracker backup, or it's damaged.");
+    return;
+  }
+
+  const isDate = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  let added = 0;
+  let unreadable = 0;
+  try {
+    for (const item of data.photos) {
+      const bytes = contents.get(item.file);
+      if (!bytes || !isDate(item.date) || typeof item.takenAt !== "number") {
+        unreadable++;
+        continue;
+      }
+      if ((days.get(item.date) || []).some((photo) => photo.takenAt === item.takenAt)) continue;
+      const photo = { date: item.date, photo: new Blob([bytes], { type: item.type || "image/jpeg" }), takenAt: item.takenAt };
+      if (item.timeUnknown) photo.timeUnknown = true;
+      photo.id = await addPhoto(photo);
+      addToDays(photo);
+      added++;
+    }
+
+    // Tracking starts on the earliest day from either place
+    const earliest = [startDate, isDate(data.startDate) ? data.startDate : null, ...days.keys()]
+      .filter(Boolean)
+      .sort()[0];
+    if (earliest < startDate) {
+      await setMeta("startDate", earliest);
+      startDate = earliest;
+    }
+  } catch {
+    render();
+    toast(`Stopped after ${added} photo${added === 1 ? "" : "s"}. Your phone may be low on space.`);
+    return;
+  }
+
+  render();
+  $("backup").close();
+  let message = added
+    ? `Restored ${added} photo${added === 1 ? "" : "s"}`
+    : "Everything in this backup is already here";
+  if (unreadable) message += `. ${unreadable} couldn't be read`;
+  toast(message);
 });
 
 // If the app stays open past midnight, refresh when you come back to it
