@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Makes the page fit a phone screen instead of a zoomed-out desktop view -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skin Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>Skin Tracker</h1>
+
+    <!-- Streak -->
+    <section class="card streak">
+      <div id="streak-number" class="streak-number">0</div>
+      <div id="streak-label">clear days in a row</div>
+      <div id="streak-best" class="muted"></div>
+    </section>
+
+    <!-- On a phone, capture="user" opens the front (selfie) camera -->
+    <label class="button">
+      <span id="camera-label">I have a breakout today</span>
+      <input id="camera" type="file" accept="image/*" capture="user" hidden>
+    </label>
+
+    <!-- Calendar -->
+    <section class="card">
+      <div class="cal-header">
+        <button id="prev-month" class="nav" aria-label="Previous month">‹</button>
+        <h2 id="month-title"></h2>
+        <button id="next-month" class="nav" aria-label="Next month">›</button>
+      </div>
+      <div class="cal-grid weekdays">
+        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+      </div>
+      <div id="calendar" class="cal-grid"></div>
+      <div class="legend">
+        <span><i class="dot clear"></i>Clear</span>
+        <span><i class="dot breakout"></i>Breakout</span>
+        <span><i class="dot none"></i>Not tracked</span>
+      </div>
+    </section>
+
+    <p class="muted small">Photos are saved only on this phone. Nothing is uploaded.</p>
+  </main>
+
+  <!-- Pop-up for viewing a day's photo -->
+  <dialog id="viewer">
+    <h2 id="viewer-title"></h2>
+    <img id="viewer-photo" alt="Breakout photo">
+    <div class="viewer-buttons">
+      <button id="viewer-delete" class="secondary">Delete</button>
+      <button id="viewer-close">Close</button>
+    </div>
+  </dialog>
+
+  <script src="dates.js"></script>
+  <script src="db.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# System junk files
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Design reference boards: other people's work, and the repo is public
+references/
+
+# Never commit test or real face photos
+test-photos/
+*.heic
