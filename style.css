@@ -151,49 +151,95 @@ p {
   margin-top: var(--s1);
 }
 
-/* Day strip: last 7 days, today bigger */
+/* Day strip: every day since you started, swipeable.
+   The day in the middle grows; app.js sets --t from 0 (far) to 1 (centred). */
 .day-strip {
   list-style: none;
   display: flex;
-  justify-content: space-between;
   align-items: flex-end;
-  width: 100%;
-  max-width: 420px;
-  margin: auto auto 0; /* pushed to the bottom of the gradient */
-  padding: var(--s6) 0 0;
+  width: calc(100% + var(--gutter) * 2); /* edge to edge */
+  margin: auto calc(var(--gutter) * -1) 0; /* pushed to the bottom of the gradient */
+  padding: var(--s6) 0 var(--s1);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* Days fade out towards both edges */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+}
+
+.day-strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* Empty space at both ends, so the first and last day can reach the middle */
+.day-strip::before,
+.day-strip::after {
+  content: "";
+  flex: 0 0 calc(50% - 28px);
 }
 
 .day-strip li {
+  flex: 0 0 56px;
+  scroll-snap-align: center;
+}
+
+.strip-day {
+  --t: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--s1);
-  width: 44px;
-  color: rgba(17, 17, 17, .55);
+  width: 100%;
+  padding: var(--s2) 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  opacity: calc(.4 + var(--t) * .6);
+  transform: scale(calc(.85 + var(--t) * .5));
+  transform-origin: center bottom;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.day-strip .weekday {
+.strip-day .weekday {
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
 }
 
-.day-strip .num {
+.strip-day .num {
   font-family: var(--font-heading);
-  font-size: 22px;
+  font-size: 24px;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
-.day-strip li.today {
+.strip-day.untracked {
+  color: rgba(17, 17, 17, .45);
+}
+
+/* Which day is in the middle; tap it to see that day's photos */
+.strip-caption {
+  display: block;
+  min-height: 32px;
+  margin: var(--s2) auto 0;
+  padding: var(--s2) var(--s3);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
   color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.day-strip li.today .num {
-  font-size: 34px;
-}
-
-.day-strip li.untracked {
-  opacity: .3;
+.strip-caption:not(:disabled) {
+  background: rgba(255, 255, 255, .45);
+  cursor: pointer;
 }
 
 /* Status mark: filled dot for a breakout, hollow ring for clear */

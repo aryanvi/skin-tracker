@@ -52,6 +52,8 @@ function showScreen() {
     else tab.removeAttribute("aria-current");
   }
   placeThumb();
+  // The strip can only measure itself while it's on screen
+  if (name === "today" && startDate) centreDay(stripKey || todayKey(), false);
   // Opening the calendar always starts on this month
   if (name === "calendar") {
     calendarRange = "month";
@@ -95,28 +97,107 @@ function render() {
 
 // ---------- Day strip ----------
 
+let stripKey = null; // the day in the middle of the strip (null = today)
+
+// Every day since tracking started (at least the last 7), oldest on the left
 function renderDayStrip() {
   const today = todayKey();
   const strip = $("day-strip");
   strip.innerHTML = "";
 
-  for (const key of lastDays(7, today)) {
+  const first = startDate < addDays(today, -6) ? startDate : addDays(today, -6);
+  for (let key = first; key <= today; key = addDays(key, 1)) {
     const date = fromKey(key);
-    const li = document.createElement("li");
     const tracked = key >= startDate;
     const breakout = days.has(key);
-    if (key === today) li.classList.add("today");
-    if (!tracked) li.classList.add("untracked");
-
     const status = !tracked ? "not tracked" : breakout ? "breakout" : "clear";
-    li.setAttribute("aria-label", `${date.toLocaleDateString(undefined, { weekday: "long", day: "numeric" })}: ${status}`);
-    li.innerHTML = `
+
+    const li = document.createElement("li");
+    const button = document.createElement("button");
+    button.className = "strip-day" + (tracked ? "" : " untracked");
+    button.dataset.key = key;
+    button.setAttribute("aria-label", `${date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}: ${status}`);
+    button.innerHTML = `
       <span class="weekday">${date.toLocaleDateString(undefined, { weekday: "short" })}</span>
       <span class="num">${date.getDate()}</span>
       <span class="mark ${tracked ? (breakout ? "breakout" : "clear") : ""}"></span>`;
+
+    // Tap: bring the day to the middle, and open its photos if it has any
+    button.addEventListener("click", () => {
+      centreDay(key, true);
+      if (breakout) openViewer(key);
+    });
+
+    li.appendChild(button);
     strip.appendChild(li);
   }
+
+  centreDay(stripKey || today, false);
 }
+
+// Scrolls the strip so a day sits in the middle
+function centreDay(key, smooth) {
+  const strip = $("day-strip");
+  const button = strip.querySelector(`[data-key="${key}"]`) || strip.querySelector("li:last-child .strip-day");
+  if (!button) return;
+  const li = button.parentElement;
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  strip.scrollTo({
+    left: li.offsetLeft + li.offsetWidth / 2 - strip.clientWidth / 2,
+    behavior: smooth && !reduceMotion ? "smooth" : "auto",
+  });
+  updateStrip();
+}
+
+// Grows the day nearest the middle and fades the rest, then updates the caption.
+// Runs on every scroll frame, which is what makes the swipe feel alive.
+function updateStrip() {
+  const strip = $("day-strip");
+  const centre = strip.scrollLeft + strip.clientWidth / 2;
+  let nearest = null;
+  let nearestT = -1;
+
+  for (const button of strip.querySelectorAll(".strip-day")) {
+    const li = button.parentElement;
+    const distance = Math.abs(li.offsetLeft + li.offsetWidth / 2 - centre);
+    const t = Math.max(0, 1 - distance / (li.offsetWidth * 2.5));
+    button.style.setProperty("--t", t.toFixed(3));
+    if (t > nearestT) {
+      nearestT = t;
+      nearest = button;
+    }
+  }
+  if (!nearest) return;
+
+  const key = nearest.dataset.key;
+  stripKey = key === todayKey() ? null : key;
+
+  // Caption, e.g. "Sat 24 Oct · Breakout · 2 photos"
+  const label = fromKey(key).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  const caption = $("strip-caption");
+  const photos = days.get(key);
+  if (key < startDate) {
+    caption.textContent = `${label} · Not tracked`;
+  } else if (photos) {
+    caption.textContent = `${label} · Breakout · ${photos.length} photo${photos.length === 1 ? "" : "s"}`;
+  } else {
+    caption.textContent = `${label} · Clear`;
+  }
+  caption.disabled = !photos;
+  caption.dataset.key = key;
+}
+
+let stripFrame = 0;
+$("day-strip").addEventListener(
+  "scroll",
+  () => {
+    cancelAnimationFrame(stripFrame);
+    stripFrame = requestAnimationFrame(updateStrip);
+  },
+  { passive: true }
+);
+
+$("strip-caption").addEventListener("click", () => openViewer($("strip-caption").dataset.key));
 
 // ---------- Streak and tiles ----------
 
