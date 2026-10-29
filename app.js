@@ -1,8 +1,9 @@
-// The screen: streak, camera button, calendar and photo viewer.
+// The screen: day strip, streak, tiles, capture, calendar and photo viewer.
 
 let startDate; // the first day the app was used, e.g. "2026-10-29"
 let entries = new Map(); // "2026-10-29" -> { date, photo, takenAt, url }
 let shownMonth = new Date(); // which month the calendar is showing
+let pendingPhoto = null; // a photo taken but not saved yet: { blob, url }
 
 const $ = (id) => document.getElementById(id);
 
@@ -29,46 +30,113 @@ async function init() {
 }
 
 function render() {
+  const today = todayKey();
+  $("today-label").textContent = fromKey(today).toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  $("camera-label").textContent = entries.has(today) ? "Retake today's photo" : "Log a breakout";
+  renderDayStrip();
   renderStreak();
   renderCalendar();
-  $("camera-label").textContent = entries.has(todayKey())
-    ? "Retake today's photo"
-    : "I have a breakout today";
 }
 
-// ---------- Streak ----------
+// ---------- Day strip ----------
+
+function renderDayStrip() {
+  const today = todayKey();
+  const strip = $("day-strip");
+  strip.innerHTML = "";
+
+  for (const key of lastDays(7, today)) {
+    const date = fromKey(key);
+    const li = document.createElement("li");
+    const tracked = key >= startDate;
+    const breakout = entries.has(key);
+    if (key === today) li.classList.add("today");
+    if (!tracked) li.classList.add("untracked");
+
+    const status = !tracked ? "not tracked" : breakout ? "breakout" : "clear";
+    li.setAttribute("aria-label", `${date.toLocaleDateString(undefined, { weekday: "long", day: "numeric" })}: ${status}`);
+    li.innerHTML = `
+      <span class="weekday">${date.toLocaleDateString(undefined, { weekday: "short" })}</span>
+      <span class="num">${date.getDate()}</span>
+      <span class="mark ${tracked ? (breakout ? "breakout" : "clear") : ""}"></span>`;
+    strip.appendChild(li);
+  }
+}
+
+// ---------- Streak and tiles ----------
 
 function renderStreak() {
+  const today = todayKey();
   const { current, best } = computeStreaks(startDate, entries);
+  const now = fromKey(today);
+  const month = monthCounts(now.getFullYear(), now.getMonth(), startDate, entries);
+
   $("streak-number").textContent = current;
   $("streak-label").textContent =
     current === 0
-      ? "Breakout logged today. A new streak starts tomorrow 💪"
-      : `clear ${current === 1 ? "day" : "days"} in a row 🔥`;
-  $("streak-best").textContent = `Best: ${best} ${best === 1 ? "day" : "days"}`;
+      ? "Breakout logged today. A fresh streak starts tomorrow."
+      : current === 1
+        ? "day clear"
+        : "days clear";
+  $("tile-best").textContent = best;
+  $("tile-clear").textContent = month.clear;
+  $("tile-breakouts").textContent = month.breakouts;
 }
 
-// ---------- Taking a photo ----------
+// ---------- Taking a photo: review first, then save ----------
 
-$("camera").addEventListener("change", async (event) => {
-  const file = event.target.files[0];
-  event.target.value = ""; // so picking the same file again still works
-  if (!file) return;
+// Both camera inputs (main button and Retake) work the same way
+for (const input of document.querySelectorAll(".camera-input")) {
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    input.value = ""; // so picking the same file again still works
+    if (!file) return;
 
+    const blob = await shrinkPhoto(file);
+    discardPending();
+    pendingPhoto = { blob, url: URL.createObjectURL(blob) };
+
+    $("review-date").textContent = fromKey(todayKey()).toLocaleDateString(undefined, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    $("review-photo").src = pendingPhoto.url;
+    if (!$("review").open) $("review").showModal();
+  });
+}
+
+$("review-save").addEventListener("click", async () => {
+  if (!pendingPhoto) return;
   const date = todayKey();
-  const photo = await shrinkPhoto(file);
-  const entry = { date, photo, takenAt: Date.now() };
+  const entry = { date, photo: pendingPhoto.blob, takenAt: Date.now() };
   await saveEntry(entry);
 
   const old = entries.get(date);
   if (old) URL.revokeObjectURL(old.url);
-  entry.url = URL.createObjectURL(photo);
+  entry.url = pendingPhoto.url; // the saved entry now owns this URL
   entries.set(date, entry);
+  pendingPhoto = null;
 
+  $("review").close();
   shownMonth = new Date();
   render();
-  openViewer(date);
 });
+
+$("review-cancel").addEventListener("click", () => $("review").close());
+
+// Closing the review without saving (Cancel or swipe/Escape) throws the photo away
+$("review").addEventListener("close", discardPending);
+
+function discardPending() {
+  if (!pendingPhoto) return;
+  URL.revokeObjectURL(pendingPhoto.url);
+  pendingPhoto = null;
+}
 
 // Phone photos are huge (several MB). Shrink them so thousands fit on the phone.
 function shrinkPhoto(file, maxSize = 1200) {
@@ -127,13 +195,16 @@ function renderCalendar() {
     if (key < startDate || key > today) {
       cell.classList.add("none");
       cell.disabled = true;
+      cell.setAttribute("aria-label", `${day}: not tracked`);
     } else if (entries.has(key)) {
       cell.classList.add("breakout");
       cell.style.backgroundImage = `url(${entries.get(key).url})`;
+      cell.setAttribute("aria-label", `${day}: breakout, view photo`);
       cell.addEventListener("click", () => openViewer(key));
     } else {
       cell.classList.add("clear");
       cell.disabled = true;
+      cell.setAttribute("aria-label", `${day}: clear`);
     }
     if (key === today) cell.classList.add("today");
 
@@ -162,14 +233,19 @@ let viewerDate = null;
 
 function openViewer(date) {
   viewerDate = date;
-  $("viewer-title").textContent = fromKey(date).toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  const d = fromKey(date);
+  $("viewer-day").textContent = d.getDate();
+  $("viewer-month").textContent =
+    d.toLocaleDateString(undefined, { weekday: "short" }) + " · " +
+    d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   $("viewer-photo").src = entries.get(date).url;
-  $("viewer-delete").textContent = "Delete";
+  disarmDelete();
   $("viewer").showModal();
+}
+
+function disarmDelete() {
+  $("viewer-delete").textContent = "Delete";
+  $("viewer-delete").classList.remove("armed");
 }
 
 $("viewer-close").addEventListener("click", () => $("viewer").close());
@@ -177,8 +253,9 @@ $("viewer-close").addEventListener("click", () => $("viewer").close());
 // Delete needs two taps, so a photo isn't removed by accident
 $("viewer-delete").addEventListener("click", async () => {
   const button = $("viewer-delete");
-  if (button.textContent === "Delete") {
+  if (!button.classList.contains("armed")) {
     button.textContent = "Tap again to delete";
+    button.classList.add("armed");
     return;
   }
   await deleteEntry(viewerDate);

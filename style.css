@@ -1,74 +1,332 @@
+/* ---------- Fonts (bundled in fonts/, never loaded from the internet) ---------- */
+
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("fonts/instrument-serif-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inconsolata";
+  src: url("fonts/inconsolata-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------- Design tokens (palette v2, from PRD section 7) ---------- */
+
 :root {
-  --bg: #faf7f5;
-  --card: #ffffff;
-  --text: #222;
-  --muted: #8a817c;
-  --accent: #d9776a;
-  --clear: #7cc495;
-  --none: #ece7e3;
+  --bg:          #FDFDFD;
+  --surface:     #FFFFFF;
+  --surface-2:   #F1F2F6;
+  --ink:         #111111;
+  --ink-muted:   #656976;
+
+  --periwinkle:  #9DA7CA;
+  --blue:        #ACC8EA;  /* clear */
+  --blue-pale:   #D4E1F4;
+  --blue-mist:   #D6E2EE;
+  --lilac:       #B2ADF5;
+
+  --amber:       #F6B85D;
+  --orange:      #F58D5E;  /* breakout */
+  --peach:       #FDBE7D;
+  --sunset:      #F98240;
+
+  --hero-gradient: linear-gradient(180deg,
+    #95A1BF 0%, #9DA8CC 10%, #A4B1D3 21%, #AEB6D4 32%, #C7BFC1 43%,
+    #ECCDBB 53%, #F9CFA9 64%, #FDBF84 75%, #FEAC64 85%, #FD9144 100%);
+
+  /* Fine film grain, drawn by an inline SVG (no download) */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  --radius-card: 20px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 1px 4px rgba(0, 0, 0, .06);
+
+  --font-heading: "Instrument Serif", Georgia, serif;
+  --font-body:    "Inconsolata", ui-monospace, Consolas, monospace;
+}
+
+/* ---------- Base ---------- */
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, system-ui, sans-serif;
+  min-height: 100dvh;
   background: var(--bg);
-  color: var(--text);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.4;
+  font-synthesis: none; /* never fake a bold */
+  -webkit-font-smoothing: antialiased;
 }
 
-main {
+h1, h2, h3, .display {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+/* Tiny uppercase labels */
+.micro {
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Hero (sunset gradient) ---------- */
+
+.hero {
+  position: relative;
+  min-height: 40dvh;
+  padding: calc(env(safe-area-inset-top) + 24px) 20px 64px;
+  background: var(--hero-gradient);
+  text-align: center;
+  overflow: hidden;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  opacity: .25;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+.hero > * {
+  position: relative; /* stay above the grain */
+  z-index: 1;
+}
+
+.hero .micro {
+  color: var(--ink);
+  opacity: .7;
+}
+
+.hero h1 {
+  font-size: 44px;
+  letter-spacing: -.01em;
+  margin-top: 4px;
+}
+
+/* Day strip: last 7 days, today bigger */
+.day-strip {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  max-width: 420px;
+  margin: 28px auto 0;
+  padding: 0;
+}
+
+.day-strip li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 44px;
+  color: rgba(17, 17, 17, .55);
+}
+
+.day-strip .weekday {
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.day-strip .num {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-strip li.today {
+  color: var(--ink);
+}
+
+.day-strip li.today .num {
+  font-size: 34px;
+}
+
+.day-strip li.untracked {
+  opacity: .3;
+}
+
+/* Status mark: filled dot for a breakout, hollow ring for clear */
+.mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+.mark.breakout {
+  background: var(--ink);
+}
+
+.mark.clear {
+  border: 1.5px solid var(--ink);
+}
+
+/* ---------- White sheet ---------- */
+
+.sheet {
+  position: relative;
+  z-index: 2;
   max-width: 480px;
-  margin: 0 auto;
-  padding: 24px 16px;
+  margin: -40px auto 0;
+  padding: 28px 16px calc(env(safe-area-inset-bottom) + 32px);
+  background: var(--surface);
+  border-radius: 28px 28px 0 0;
   text-align: center;
 }
 
-h1 {
-  margin: 0 0 16px;
+@media (min-width: 520px) {
+  .sheet {
+    border-radius: 28px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow-soft);
+  }
 }
 
-.card {
-  background: var(--card);
-  border-radius: 16px;
-  padding: 16px;
-  margin: 16px 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-}
-
-.muted {
-  color: var(--muted);
-}
-
-.small {
-  font-size: 0.85rem;
-}
-
-/* Streak */
 .streak-number {
-  font-size: 4rem;
-  font-weight: 700;
-  line-height: 1.1;
+  font-size: 112px;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
 }
 
-/* Buttons */
-.button,
-button {
-  display: inline-block;
-  padding: 14px 24px;
+.streak-label {
+  color: var(--ink-muted);
+  max-width: 280px;
+  margin: 6px auto 0;
+}
+
+/* Summary tiles */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 24px 0 20px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 10px;
+  background: var(--surface-2);
+  border-radius: 16px;
+  text-align: left;
+}
+
+.tile .micro {
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.tile strong {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Buttons ---------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 24px;
   border: none;
-  border-radius: 12px;
-  background: var(--accent);
-  color: white;
-  font-size: 1.1rem;
-  font-family: inherit;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform .15s ease;
+}
+
+.button:active {
+  transform: scale(.97);
+}
+
+.button.primary {
+  background: var(--ink);
+  color: #fff;
+}
+
+.button.secondary {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.button.quiet {
+  background: none;
+  color: var(--ink-muted);
+}
+
+.button.quiet.armed {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.capture {
+  width: 100%;
+}
+
+.text-button {
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--ink-muted);
+  padding: 12px;
   cursor: pointer;
 }
 
-button.secondary {
-  background: var(--none);
-  color: var(--text);
+/* ---------- Calendar ---------- */
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 16px 12px;
+  margin-top: 16px;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--surface-2);
 }
 
-/* Calendar */
 .cal-header {
   display: flex;
   align-items: center;
@@ -76,117 +334,182 @@ button.secondary {
 }
 
 .cal-header h2 {
-  margin: 0;
-  font-size: 1.1rem;
+  font-size: 28px;
 }
 
 button.nav {
-  background: none;
-  color: var(--text);
-  font-size: 1.6rem;
-  padding: 4px 14px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
 }
 
 button.nav:disabled {
-  opacity: 0.2;
+  opacity: .3;
+  cursor: default;
 }
 
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 12px;
 }
 
-.weekdays span {
-  font-size: 0.75rem;
-  color: var(--muted);
+.weekdays {
+  font-size: 10px;
 }
 
 .day {
   aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  font-size: 0.9rem;
+  display: grid;
+  place-items: center;
   padding: 0;
-  color: var(--text);
-  background: var(--none);
+  border: none;
+  border-radius: 50%;
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--surface-2);
   background-size: cover;
   background-position: center;
 }
 
 .day.clear {
-  background-color: var(--clear);
-  color: white;
+  background-color: var(--blue);
 }
 
 .day.breakout {
-  background-color: var(--accent);
-  color: white;
-  font-weight: 700;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
-  box-shadow: inset 0 0 0 3px var(--accent);
+  color: #fff;
+  background-color: var(--orange);
+  box-shadow: inset 0 0 0 2px var(--orange);
+  text-shadow: 0 0 4px rgba(0, 0, 0, .7);
+  cursor: pointer;
 }
 
 .day.none {
-  color: var(--muted);
+  color: var(--ink-muted);
+  opacity: .5;
 }
 
 .day.today {
-  outline: 2px solid var(--text);
-  outline-offset: 1px;
+  outline: 1.5px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .legend {
   display: flex;
   justify-content: center;
   gap: 14px;
-  margin-top: 12px;
-  font-size: 0.8rem;
-  color: var(--muted);
+  margin-top: 14px;
+  font-size: 10px;
 }
 
-.dot {
+.key {
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: 3px;
-  margin-right: 4px;
-  vertical-align: middle;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: -1px;
 }
 
-.dot.clear { background: var(--clear); }
-.dot.breakout { background: var(--accent); }
-.dot.none { background: var(--none); }
+.key.clear { background: var(--blue); }
+.key.breakout { background: var(--orange); }
+.key.none { background: var(--surface-2); }
 
-/* Photo viewer pop-up */
-dialog {
-  border: none;
-  border-radius: 16px;
-  padding: 16px;
+.footnote {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+/* ---------- Pop-ups (review and viewer) ---------- */
+
+.sheet-dialog {
   width: min(92vw, 440px);
+  max-height: 92dvh;
+  padding: 20px 16px 12px;
+  border: none;
+  border-radius: 28px;
+  background: var(--surface);
+  color: var(--ink);
   text-align: center;
 }
 
-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.6);
+.sheet-dialog::backdrop {
+  background: rgba(17, 17, 17, .55);
 }
 
-dialog h2 {
-  margin: 0 0 12px;
-  font-size: 1.1rem;
+.sheet-dialog h2 {
+  font-size: 32px;
+  margin: 2px 0 14px;
 }
 
-#viewer-photo {
+.photo {
+  display: block;
   width: 100%;
-  border-radius: 12px;
+  max-height: 60dvh;
+  object-fit: cover;
+  border-radius: 20px;
+  background: var(--surface-2);
 }
 
-.viewer-buttons {
-  display: flex;
+.dialog-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  justify-content: center;
-  margin-top: 12px;
+  margin-top: 14px;
+}
+
+/* Viewer: big date numeral on the photo */
+.photo-card {
+  position: relative;
+}
+
+.photo-date {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .78);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.photo-date .display {
+  font-size: 56px;
+  line-height: .9;
+}
+
+.photo-date .micro {
+  color: var(--ink);
+}
+
+/* ---------- Gentle motion, switched off for Reduce Motion ---------- */
+
+.sheet-dialog[open] {
+  animation: rise .25s ease-out;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

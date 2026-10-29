@@ -24,6 +24,9 @@ Option B (breakout days only): a photo is taken only on a breakout day, and a da
 - `app.js`: screen logic (streak, capture, calendar, viewer)
 - `db.js`: IndexedDB storage (`entries` keyed by "YYYY-MM-DD", `meta` holds `startDate`)
 - `dates.js`: date helpers and streak maths; it must stay loadable in Node for tests
+- `tests/`: `node --test` tests for `dates.js`
+- `fonts/`: bundled Instrument Serif 400 (headings) and Inconsolata 500 (body), with their OFL licences
+- Design tokens live at the top of `style.css` (palette v2 from PRD §7). Status colours: clear = `--blue`, breakout = `--orange`.
 - `references/`: design reference boards, kept out of git (other people's work)
 
 ## Commands

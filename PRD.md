@@ -121,8 +121,8 @@ content, branding, icons or layouts one to one.
 ### What to take from the references
 | Reference | Take this |
 |---|---|
-| Habit "Statistics" screens | Soft cream background, pastel pink / green / yellow / lavender / blue, black pill segmented control, floating black bottom bar with a pink centre button, rounded light cards, year heat map of rounded squares, tile summary (current streak, success rate, best streak, total) |
-| Warm gradient fitness screen | Large display numerals, a day strip where the selected day is bigger, frosted translucent stat tiles over a warm gradient that fades to white, a white sheet rising over the gradient, thin gradient range bars, a black circular add button |
+| Habit "Statistics" screens | Soft light background, black pill segmented control, floating black bottom bar with a raised centre button (colours now come from palette v2, not this board), rounded light cards, year heat map of rounded squares, tile summary (current streak, success rate, best streak, total) |
+| Gradient fitness screen | Large display numerals, a day strip where the selected day is bigger, frosted translucent stat tiles over the **sunset gradient** (see Hero gradient below; replaces the gold in the reference), a white sheet rising over the gradient, thin gradient range bars, a black circular add button |
 | Photo journal boards | Circular photo calendar by month, faded circles for empty days, stacked polaroid-style cards with a slight rotation, blurred "+12" overflow card, big date numeral on the photo, month/year dropdown pill, tiny uppercase monospace micro-labels, grainy gradients |
 
 ### Screens
@@ -135,43 +135,67 @@ content, branding, icons or layouts one to one.
 7. **Settings.** Export, import, storage used, and a short plain statement that nothing is uploaded.
 
 ### Navigation
-A floating black pill bar with three icons (Today, Album, Progress) and a raised pink circular button
+A floating black pill bar with three icons (Today, Album, Progress) and a raised black circular button
 in the middle for the camera. It sits above the home indicator and respects safe-area insets.
 
 ### Design tokens
-Colours are sampled by eye and by pixel from her references. Treat them as a starting palette and ask
-her before locking them.
+**Palette v2 (decided by Anvi):** the hero is the blue-to-orange sunset gradient, not gold. Colours come from her journal and sunset board
+(`references/04-journal-and-sunset-colours.png`). They were sampled from the image, so treat them as final unless she asks to tweak.
 
 ```css
 :root {
-  --bg:        #FEFDF8;  /* warm cream page */
-  --surface:   #FFFFFF;  /* sheets and cards */
-  --surface-2: #F3F2EC;  /* quiet cards, inactive pills */
-  --ink:       #111111;  /* text, black pills, nav bar */
-  --ink-muted: #8A867E;
+  --bg:          #FDFDFD;  /* page */
+  --surface:     #FFFFFF;  /* sheets and cards */
+  --surface-2:   #F1F2F6;  /* quiet cards, inactive pills */
+  --ink:         #111111;  /* text, black pills, nav bar, camera button */
+  --ink-muted:   #656976;  /* secondary text (4.9:1 on the page colour) */
 
-  --pink:      #EEC3DE;  /* primary soft colour, camera button */
-  --pink-soft: #FDE7F3;  /* gentle highlight cards */
-  --green:     #CEDC91;  /* clear */
-  --yellow:    #EBDB62;  /* some */
-  --lavender:  #DFDDEB;
-  --blue:      #BCCBEA;
-  --flare:     #F2A3B8;  /* flare; pick a tone that reads as soft, not alarming */
+  --periwinkle:  #9DA7CA;  /* sky blue, top of the hero */
+  --blue:        #ACC8EA;  /* clear */
+  --blue-pale:   #D4E1F4;  /* tracks, quiet fills */
+  --blue-mist:   #D6E2EE;
+  --lilac:       #B2ADF5;  /* accent */
 
-  --gold-top:  #D9A528;  /* hero gradient start; fades to white */
+  --amber:       #F6B85D;  /* some */
+  --orange:      #F58D5E;  /* flare: warm and soft, not alarming */
+  --peach:       #FDBE7D;
+  --sunset:      #F98240;  /* rare accent, for example the active tab dot */
+
+  /* Hero gradient: sunset sky, sampled from references/05-sunset-gradient.png.
+     Periwinkle at the top, through lavender and peach, to orange at the bottom. */
+  --hero-gradient: linear-gradient(180deg,
+    #95A1BF 0%, #9DA8CC 10%, #A4B1D3 21%, #AEB6D4 32%, #C7BFC1 43%,
+    #ECCDBB 53%, #F9CFA9 64%, #FDBF84 75%, #FEAC64 85%, #FD9144 100%);
 
   --radius-card: 20px;
   --radius-pill: 999px;
   --shadow-soft: 0 1px 4px rgba(0,0,0,.06);
+
+  --font-heading: "Instrument Serif", Georgia, serif;           /* Regular, 400 */
+  --font-body:    "Inconsolata", ui-monospace, Consolas, monospace; /* Medium, 500 */
 }
+
+body { font-family: var(--font-body); font-weight: 500; font-synthesis: none; }
+h1, h2, h3, .display { font-family: var(--font-heading); font-weight: 400; }
 ```
 
-- **Status colours:** Clear = green, Some = yellow, Flare = soft pink or coral. Avoid harsh red. This is a
+- **Status colours:** Clear = soft blue, Some = amber, Flare = warm orange. No harsh red anywhere. This is a
   kind tool for someone looking at her own skin, and the wording should be gentle too.
-- **Type:** a clean grotesque such as Inter (or Inter Tight) with tight tracking on big numerals
-  (about -0.03em), plus a small monospace such as DM Mono for uppercase micro-labels.
-  **Bundle the font files locally.** Do not load fonts from a CDN, because that would be a network call.
-- **Numerals:** the streak number is the hero, around 96px or more, weight 600 to 700.
+- **Type (decided by Anvi):** **Instrument Serif Regular** for headings and **Inconsolata Medium** (weight 500) for all body text.
+  - Headings: month titles, screen titles, the date numeral on photos, and the big streak number.
+  - Body, buttons, labels, tiles, pills and the nav: Inconsolata Medium. Uppercase micro-labels use the same font with
+    wider letter-spacing (about 0.08em) and a smaller size.
+  - Instrument Serif only comes in Regular and Italic, and Inconsolata is monospace. So build hierarchy with **size, spacing and colour, not bold weight**.
+    Set `font-synthesis: none` so the browser never fakes a bold. Check that body text stays comfortable to read at 14 to 16px
+    and use `font-variant-numeric: tabular-nums` for dates and counts.
+  - **Bundle the font files locally** (download the OFL-licensed `.woff2` files and add them with `@font-face`, using `font-display: swap`).
+    Do not load fonts from Google Fonts or any CDN, because that would be a network call. Add a serif and a monospace fallback in the font stack.
+- **Numerals:** the streak number is the hero, around 96px or more, in Instrument Serif Regular with slightly tight tracking (about -0.02em).
+- **Hero gradient (decided by Anvi):** the top part of the Today screen (roughly the top 40%) uses `--hero-gradient`.
+  Add a fine **film-grain texture** on top, as in her sunset reference: an inline SVG `feTurbulence` noise as a CSS
+  background at about 20 to 30% opacity (inline data URI, so no network request). A white sheet with rounded top corners
+  rises over the bottom of the gradient and holds the streak number and tiles. Dark ink text reads well on every stop of the gradient.
+  Do not put white text on it. Do not use the gradient behind long text or on the Album screen; keep those white.
 - **Motion:** gentle and short. Respect `prefers-reduced-motion`.
 - **No emoji** in the UI. Use simple line icons (inline SVG).
 - **Accessibility:** colour is never the only signal for status, so add a small label or icon. Keep text contrast readable on the pastel fills.
@@ -236,7 +260,7 @@ Do not use a tool just to tick a box.
 - **Reminders.** Web push on iOS needs the app installed to the home screen and has limits. Verify before promising it.
 - **Camera guide overlay** needs a live camera stream, so it changes the capture flow. Keep it as a stretch.
 - **Naming.** "Skin Tracker" is a placeholder. Ask her.
-- **Palette.** Confirm the sampled colours before locking tokens.
+- **Palette.** v2 is set (blue hero). If something looks off on a real phone screen, adjust tokens in one place and ask Anvi.
 
 ---
 

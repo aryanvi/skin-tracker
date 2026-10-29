@@ -40,7 +40,29 @@ function computeStreaks(startKey, breakoutDays, today = todayKey()) {
   return { current, best };
 }
 
+// The last n days, oldest first, ending today. Used for the day strip.
+function lastDays(n, today = todayKey()) {
+  const days = [];
+  for (let i = n - 1; i >= 0; i--) days.push(addDays(today, -i));
+  return days;
+}
+
+// Clear and breakout days in one month, counting only tracked days
+// (from the start date up to today). month is 0 for January.
+function monthCounts(year, month, startKey, breakoutDays, today = todayKey()) {
+  let clear = 0;
+  let breakouts = 0;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = toKey(new Date(year, month, day));
+    if (key < startKey || key > today) continue;
+    if (breakoutDays.has(key)) breakouts++;
+    else clear++;
+  }
+  return { clear, breakouts };
+}
+
 // Lets Node load this file for testing. Browsers ignore it.
 if (typeof module !== "undefined") {
-  module.exports = { toKey, fromKey, addDays, todayKey, computeStreaks };
+  module.exports = { toKey, fromKey, addDays, todayKey, computeStreaks, lastDays, monthCounts };
 }
