@@ -116,16 +116,17 @@ function render() {
 
 // ---------- Day strip ----------
 
-let stripKey = null; // the day in the middle of the strip (null = today)
+let stripKey = null; // the day in the left-hand spot of the strip (null = today)
 
-// Every day since tracking started (at least the last 7), oldest on the left
+// Every day since tracking started (at least the last 7).
+// Today is on the left and older days run to the right.
 function renderDayStrip() {
   const today = todayKey();
   const strip = $("day-strip");
   strip.innerHTML = "";
 
   const first = startDate < addDays(today, -6) ? startDate : addDays(today, -6);
-  for (let key = first; key <= today; key = addDays(key, 1)) {
+  for (let key = today; key >= first; key = addDays(key, -1)) {
     const date = fromKey(key);
     const tracked = key >= startDate;
     const breakout = days.has(key);
@@ -141,7 +142,7 @@ function renderDayStrip() {
       <span class="num">${date.getDate()}</span>
       <span class="mark ${tracked ? (breakout ? "breakout" : "clear") : ""}"></span>`;
 
-    // Tap: bring the day to the middle, and open its photos if it has any
+    // Tap: bring the day to the left-hand spot, and open its photos if it has any
     button.addEventListener("click", () => {
       centreDay(key, true);
       if (breakout) openViewer(key);
@@ -154,33 +155,69 @@ function renderDayStrip() {
   centreDay(stripKey || today, false);
 }
 
-// Scrolls the strip so a day sits in the middle
+// Scrolls the strip so a day sits in the left-hand spot
 function centreDay(key, smooth) {
   const strip = $("day-strip");
-  const button = strip.querySelector(`[data-key="${key}"]`) || strip.querySelector("li:last-child .strip-day");
+  const button = strip.querySelector(`[data-key="${key}"]`) || strip.querySelector(".strip-day");
   if (!button) return;
   const li = button.parentElement;
+  const target = li.offsetLeft - strip.firstElementChild.offsetLeft; // today's position is the spot
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  strip.scrollTo({
-    left: li.offsetLeft + li.offsetWidth / 2 - strip.clientWidth / 2,
-    behavior: smooth && !reduceMotion ? "smooth" : "auto",
-  });
-  updateStrip();
+  if (smooth && !reduceMotion) {
+    glideStrip(target);
+  } else {
+    stopGlide();
+    strip.scrollLeft = target;
+    updateStrip();
+  }
 }
 
-// Grows the day nearest the middle and fades the rest, then updates the caption.
+// Our own smooth scroll. The browser's built-in one sometimes gets skipped
+// when it clashes with snapping, so snapping is paused while this runs.
+let glideFrame = 0;
+function glideStrip(target) {
+  const strip = $("day-strip");
+  stopGlide();
+  const start = strip.scrollLeft;
+  const change = target - start;
+  if (!change) return;
+  const startTime = performance.now();
+  strip.style.scrollSnapType = "none";
+  const step = (now) => {
+    const progress = Math.min(1, (now - startTime) / 380);
+    const eased = 1 - (1 - progress) ** 3; // fast start, gentle stop
+    strip.scrollLeft = start + change * eased;
+    if (progress < 1) glideFrame = requestAnimationFrame(step);
+    else strip.style.scrollSnapType = "";
+  };
+  glideFrame = requestAnimationFrame(step);
+}
+
+function stopGlide() {
+  cancelAnimationFrame(glideFrame);
+  $("day-strip").style.scrollSnapType = "";
+}
+
+// If you touch the strip mid-glide, your finger wins
+$("day-strip").addEventListener("pointerdown", stopGlide, { passive: true });
+
+// Grows the day in the left-hand spot and steps the others down in size and
+// strength the further right they are, then updates the caption.
 // Runs on every scroll frame, which is what makes the swipe feel alive.
 function updateStrip() {
   const strip = $("day-strip");
   if (!strip.clientWidth) return; // hidden (on another screen): nothing to measure
-  const centre = strip.scrollLeft + strip.clientWidth / 2;
+  const firstLi = strip.firstElementChild;
+  if (!firstLi) return;
+  const spot = strip.scrollLeft + firstLi.offsetLeft + firstLi.offsetWidth / 2;
   let nearest = null;
   let nearestT = -1;
 
   for (const button of strip.querySelectorAll(".strip-day")) {
     const li = button.parentElement;
-    const distance = Math.abs(li.offsetLeft + li.offsetWidth / 2 - centre);
-    const t = Math.max(0, 1 - distance / (li.offsetWidth * 2.5));
+    const distance = Math.abs(li.offsetLeft + li.offsetWidth / 2 - spot);
+    // Gentle falloff over ~6 days, squared so the step down is strongest near the spot
+    const t = Math.max(0, 1 - distance / (li.offsetWidth * 6.5)) ** 2;
     button.style.setProperty("--t", t.toFixed(3));
     if (t > nearestT) {
       nearestT = t;
