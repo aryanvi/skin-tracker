@@ -21,7 +21,7 @@ Option B (breakout days only): photos are taken only on breakout days (any numbe
 
 ## Project layout
 - `index.html`, `style.css`: page and styles
-- `app.js`: screen logic (streak, capture, calendar, viewer). There are two screens, Today and Calendar, chosen by the URL hash (`#today`, `#calendar`) and switched with the floating nav bar. The Calendar screen has two switches. Photos | Lines (Lines = an orange line under breakout days, no photos) is remembered in localStorage. Month | All defaults to one month with arrows and resets each time the screen opens; All stacks months newest-first.
+- `app.js`: screen logic (streak, capture, calendar, viewer). There are two screens, Today and Calendar, chosen by the URL hash (`#today`, `#calendar`). The floating nav bar is a black pill with only Today and Calendar text labels, and a white pill slides to the active one; there is no camera button in the nav. The Calendar screen is left-aligned and Notion-style: view tabs Photos | Lines (underline on the active tab, remembered in localStorage), a "Month ⌄" picker on the right (Month / All months, a native select under a text label; it resets to Month each time the screen opens), and in Month mode a toolbar with the month on the left and Today ‹ › on the right.
 - `db.js`: IndexedDB storage, version 2. `photos` (auto id, indexed by `date`) allows any number of photos per day; `meta` holds `startDate`. The old v1 `entries` store (one photo per day) is kept untouched as a backup. Remove it in v3 only after export/import exists. The version history is at the top of the file.
 - `dates.js`: date helpers and streak maths; it must stay loadable in Node for tests
 - `tests/`: `node --test` tests for `dates.js`

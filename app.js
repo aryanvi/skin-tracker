@@ -51,6 +51,7 @@ function showScreen() {
     if (tab.dataset.screen === name) tab.setAttribute("aria-current", "page");
     else tab.removeAttribute("aria-current");
   }
+  $("tabbar").dataset.active = name; // slides the white pill
   // Opening the calendar always starts on this month
   if (name === "calendar") {
     calendarRange = "month";
@@ -204,12 +205,11 @@ function renderCalendar() {
   $("since-label").textContent =
     "Since " + start.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
 
-  for (const button of document.querySelectorAll("[data-view]")) {
-    button.setAttribute("aria-pressed", button.dataset.view === calendarView);
+  for (const tab of document.querySelectorAll("[data-view]")) {
+    tab.setAttribute("aria-selected", tab.dataset.view === calendarView);
   }
-  for (const button of document.querySelectorAll("[data-range]")) {
-    button.setAttribute("aria-pressed", button.dataset.range === calendarRange);
-  }
+  $("range").value = calendarRange;
+  $("range-label").textContent = calendarRange === "month" ? "Month" : "All months";
 
   $("legend").innerHTML =
     calendarView === "photos"
@@ -246,14 +246,17 @@ function renderMonth(year, month, today, withArrows = false) {
   const title = new Date(year, month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const summary = `${counts.breakouts} breakout${counts.breakouts === 1 ? "" : "s"} · ${counts.clear} clear`;
   const head = withArrows
-    ? `<div class="month-head with-arrows">
-        <button class="nav prev" aria-label="Previous month">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-        </button>
+    ? `<div class="month-head toolbar">
         <div><h2>${title}</h2><span class="micro">${summary}</span></div>
-        <button class="nav next" aria-label="Next month">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
-        </button>
+        <div class="toolbar-actions">
+          <button class="ghost to-today">Today</button>
+          <button class="nav prev" aria-label="Previous month">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <button class="nav next" aria-label="Next month">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
       </div>`
     : `<div class="month-head"><h2>${title}</h2><span class="micro">${summary}</span></div>`;
   section.innerHTML = `
@@ -319,10 +322,16 @@ function renderMonth(year, month, today, withArrows = false) {
     const monthKey = toKey(new Date(year, month, 1)).slice(0, 7);
     const prev = section.querySelector(".prev");
     const next = section.querySelector(".next");
+    const toToday = section.querySelector(".to-today");
     prev.disabled = monthKey <= startDate.slice(0, 7);
     next.disabled = monthKey >= today.slice(0, 7);
+    toToday.disabled = monthKey === today.slice(0, 7);
     prev.addEventListener("click", () => moveMonth(-1));
     next.addEventListener("click", () => moveMonth(1));
+    toToday.addEventListener("click", () => {
+      shownMonth = null; // back to this month
+      renderCalendar();
+    });
   }
 
   return section;
@@ -334,13 +343,11 @@ function moveMonth(step) {
   renderCalendar();
 }
 
-// Month | All switch. Not remembered: the calendar always opens on one month.
-for (const button of document.querySelectorAll("[data-range]")) {
-  button.addEventListener("click", () => {
-    calendarRange = button.dataset.range;
-    renderCalendar();
-  });
-}
+// Month / All months picker. Not remembered: the calendar always opens on one month.
+$("range").addEventListener("change", () => {
+  calendarRange = $("range").value;
+  renderCalendar();
+});
 
 // Photos | Lines switch. The choice is remembered on this phone.
 for (const button of document.querySelectorAll("[data-view]")) {
