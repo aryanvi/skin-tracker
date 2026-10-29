@@ -44,6 +44,8 @@ function addToDays(photo) {
 // anything else shows Today. This makes the phone's back gesture work.
 function showScreen() {
   const name = location.hash === "#calendar" ? "calendar" : "today";
+  // The phone's back gesture shouldn't leave a photo open over another screen
+  for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
   for (const screen of document.querySelectorAll(".screen")) {
     screen.hidden = screen.id !== `screen-${name}`;
   }
@@ -80,7 +82,24 @@ document.fonts.ready.then(() => {
   placeThumb();
   requestAnimationFrame(() => $("tabbar").classList.add("ready"));
 });
-window.addEventListener("resize", placeThumb);
+window.addEventListener("resize", () => {
+  placeThumb();
+  if (startDate) centreDay(stripKey || todayKey(), false); // e.g. after turning the phone
+});
+
+// ---------- Short messages ----------
+
+let toastTimer = 0;
+function toast(message) {
+  const el = $("toast");
+  el.textContent = message;
+  el.hidden = false;
+  el.style.animation = "none"; // restart the slide-in
+  el.offsetHeight;
+  el.style.animation = "";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 2600);
+}
 
 function render() {
   const today = todayKey();
@@ -153,6 +172,7 @@ function centreDay(key, smooth) {
 // Runs on every scroll frame, which is what makes the swipe feel alive.
 function updateStrip() {
   const strip = $("day-strip");
+  if (!strip.clientWidth) return; // hidden (on another screen): nothing to measure
   const centre = strip.scrollLeft + strip.clientWidth / 2;
   let nearest = null;
   let nearestT = -1;
@@ -207,7 +227,15 @@ function renderStreak() {
   const now = fromKey(today);
   const month = monthCounts(now.getFullYear(), now.getMonth(), startDate, days);
 
-  $("streak-number").textContent = current;
+  // Bounce the number when it changes (not on first load)
+  const number = $("streak-number");
+  if (number.dataset.value !== undefined && number.dataset.value !== String(current)) {
+    number.classList.remove("pop");
+    number.offsetHeight; // restart the animation
+    number.classList.add("pop");
+  }
+  number.dataset.value = current;
+  number.textContent = current;
   $("streak-label").textContent =
     current === 0
       ? "Breakout logged today. A fresh streak starts tomorrow."
@@ -228,7 +256,13 @@ for (const input of document.querySelectorAll(".camera-input")) {
     input.value = ""; // so picking the same file again still works
     if (!file) return;
 
-    const blob = await shrinkPhoto(file);
+    let blob;
+    try {
+      blob = await shrinkPhoto(file);
+    } catch {
+      toast("That photo couldn't be opened. Try taking it again.");
+      return;
+    }
     discardPending();
     pendingPhoto = { blob, url: URL.createObjectURL(blob) };
 
@@ -246,7 +280,12 @@ for (const input of document.querySelectorAll(".camera-input")) {
 $("review-save").addEventListener("click", async () => {
   if (!pendingPhoto) return;
   const photo = { date: todayKey(), photo: pendingPhoto.blob, takenAt: Date.now() };
-  photo.id = await addPhoto(photo);
+  try {
+    photo.id = await addPhoto(photo);
+  } catch {
+    toast("Couldn't save the photo. Your phone may be low on space.");
+    return; // keep the review open so the photo isn't lost
+  }
   URL.revokeObjectURL(pendingPhoto.url);
   pendingPhoto = null;
   addToDays(photo);
@@ -256,6 +295,17 @@ $("review-save").addEventListener("click", async () => {
 });
 
 $("review-cancel").addEventListener("click", () => $("review").close());
+
+// The camera buttons are labels (that's how they open the camera), so make
+// Enter and Space work on them like a normal button
+for (const label of document.querySelectorAll('label[role="button"]')) {
+  label.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      label.querySelector("input").click();
+    }
+  });
+}
 
 // Closing the review without saving (Cancel or swipe/Escape) throws the photo away
 $("review").addEventListener("close", discardPending);
@@ -320,7 +370,13 @@ function renderCalendar() {
 
   if (calendarRange === "month") {
     if (!shownMonth) shownMonth = { year: now.getFullYear(), month: now.getMonth() };
-    months.appendChild(renderMonth(shownMonth.year, shownMonth.month, today, true));
+    const section = renderMonth(shownMonth.year, shownMonth.month, today, true);
+    if (monthStep) {
+      section.classList.add("slide");
+      section.style.setProperty("--dir", monthStep);
+      monthStep = 0;
+    }
+    months.appendChild(section);
     return;
   }
 
@@ -405,8 +461,11 @@ function renderMonth(year, month, today, withArrows = false) {
       cell.addEventListener("click", () => openViewer(key));
     } else {
       cell.classList.add("clear");
-      cell.disabled = true;
       cell.setAttribute("aria-label", `${day}: clear`);
+      cell.addEventListener("click", () => {
+        const label = fromKey(key).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+        toast(`${label} · Clear day`);
+      });
     }
     if (key === today) cell.classList.add("today");
 
@@ -428,6 +487,7 @@ function renderMonth(year, month, today, withArrows = false) {
     next.addEventListener("click", () => moveMonth(1));
     toToday.addEventListener("click", () => {
       shownMonth = null; // back to this month
+      monthStep = 1;
       renderCalendar();
     });
   }
@@ -435,9 +495,12 @@ function renderMonth(year, month, today, withArrows = false) {
   return section;
 }
 
+let monthStep = 0; // -1 or 1 while a month change is animating in
+
 function moveMonth(step) {
   const d = new Date(shownMonth.year, shownMonth.month + step, 1);
   shownMonth = { year: d.getFullYear(), month: d.getMonth() };
+  monthStep = step;
   renderCalendar();
 }
 
@@ -498,14 +561,41 @@ function showViewerPhoto() {
   disarmDelete();
 }
 
-$("viewer-prev").addEventListener("click", () => {
-  viewerIndex--;
+// Move to the previous (-1) or next (1) photo of the day, sliding it in
+function stepViewer(step) {
+  const next = viewerIndex + step;
+  if (next < 0 || next >= days.get(viewerDate).length) return;
+  viewerIndex = next;
   showViewerPhoto();
-});
+  const photo = $("viewer-photo");
+  photo.style.setProperty("--dir", step);
+  photo.classList.remove("slide");
+  photo.offsetHeight; // restart the animation
+  photo.classList.add("slide");
+}
 
-$("viewer-next").addEventListener("click", () => {
-  viewerIndex++;
-  showViewerPhoto();
+$("viewer-prev").addEventListener("click", () => stepViewer(-1));
+$("viewer-next").addEventListener("click", () => stepViewer(1));
+
+// Swipe left or right on the photo to flip through the day's photos
+let swipeStartX = null;
+$("viewer-photo").addEventListener("pointerdown", (event) => (swipeStartX = event.clientX));
+$("viewer-photo").addEventListener("pointerup", (event) => {
+  if (swipeStartX === null) return;
+  const distance = event.clientX - swipeStartX;
+  swipeStartX = null;
+  if (Math.abs(distance) > 40) stepViewer(distance < 0 ? 1 : -1);
+});
+$("viewer-photo").addEventListener("pointercancel", () => (swipeStartX = null));
+$("viewer-photo").draggable = false;
+
+// Tapping the dark area outside the photo closes it
+$("viewer").addEventListener("click", (event) => {
+  const box = $("viewer").getBoundingClientRect();
+  const outside =
+    event.clientX < box.left || event.clientX > box.right ||
+    event.clientY < box.top || event.clientY > box.bottom;
+  if (outside) $("viewer").close();
 });
 
 function disarmDelete() {
@@ -525,7 +615,13 @@ $("viewer-delete").addEventListener("click", async () => {
     return;
   }
   const photos = days.get(viewerDate);
-  await deletePhoto(photos[viewerIndex].id);
+  try {
+    await deletePhoto(photos[viewerIndex].id);
+  } catch {
+    toast("Couldn't delete the photo. Please try again.");
+    disarmDelete();
+    return;
+  }
   const [removed] = photos.splice(viewerIndex, 1);
   URL.revokeObjectURL(removed.url);
 

@@ -29,14 +29,15 @@
         <p class="streak-label" id="streak-label">days clear</p>
       </section>
 
+      <!-- Tapping a tile opens the Calendar -->
       <div class="tiles">
-        <div class="tile"><span class="micro">Best streak</span><strong id="tile-best">0</strong></div>
-        <div class="tile"><span class="micro">Clear this month</span><strong id="tile-clear">0</strong></div>
-        <div class="tile"><span class="micro">Breakouts this month</span><strong id="tile-breakouts">0</strong></div>
+        <a class="tile" href="#calendar"><span class="micro">Best streak</span><strong id="tile-best">0</strong></a>
+        <a class="tile" href="#calendar"><span class="micro">Clear this month</span><strong id="tile-clear">0</strong></a>
+        <a class="tile" href="#calendar"><span class="micro">Breakouts this month</span><strong id="tile-breakouts">0</strong></a>
       </div>
 
       <!-- On a phone, capture="user" opens the front (selfie) camera -->
-      <label class="button primary capture">
+      <label class="button primary capture" tabindex="0" role="button">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
         <span id="camera-label">Log a breakout</span>
         <input class="camera-input" type="file" accept="image/*" capture="user" hidden>
@@ -96,7 +97,7 @@
     <h2>Keep this photo?</h2>
     <img id="review-photo" class="photo" alt="Photo you just took">
     <div class="dialog-buttons">
-      <label class="button secondary">
+      <label class="button secondary" tabindex="0" role="button">
         Retake
         <input class="camera-input" type="file" accept="image/*" capture="user" hidden>
       </label>
@@ -129,6 +130,9 @@
       <button id="viewer-close" class="button primary" autofocus>Close</button>
     </div>
   </dialog>
+
+  <!-- Short messages, e.g. when a photo can't be opened -->
+  <div class="toast" id="toast" role="status" hidden></div>
 
   <script src="dates.js"></script>
   <script src="db.js"></script>

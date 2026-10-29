@@ -880,3 +880,100 @@ button.nav:disabled {
     transition: none !important;
   }
 }
+
+/* ---------- Feedback and movement ---------- */
+
+/* Small message above the nav bar, e.g. "Wed 28 Oct · Clear day" */
+.toast {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 84px);
+  max-width: calc(100vw - var(--gutter) * 2);
+  padding: var(--s2) var(--s4);
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+  text-align: center;
+  transform: translateX(-50%);
+  animation: toast-in .25s ease-out;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Screens ease in when you switch to them */
+.screen:not([hidden]) {
+  animation: screen-in .3s ease-out;
+}
+
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A new month slides in from the side you're moving towards */
+.month.slide {
+  animation: month-in .3s ease-out;
+}
+
+@keyframes month-in {
+  from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 24px)); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Viewer: the next photo slides in from the side you swiped */
+.photo.slide {
+  animation: photo-in .25s ease-out;
+}
+
+@keyframes photo-in {
+  from { opacity: .4; transform: translateX(calc(var(--dir, 1) * 32px)); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The streak number gives a little bounce when it changes */
+.streak-number.pop {
+  animation: pop .45s cubic-bezier(.3, 1.5, .5, 1);
+}
+
+@keyframes pop {
+  from { transform: scale(.8); opacity: .3; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* Press feedback on everything tappable */
+.tile,
+.day:not(:disabled),
+.ghost,
+button.nav,
+.view-tab,
+.strip-caption {
+  transition: transform .15s ease;
+}
+
+.tile:active,
+.day:not(:disabled):active,
+.ghost:active:not(:disabled),
+button.nav:active:not(:disabled),
+.strip-caption:active:not(:disabled) {
+  transform: scale(.95);
+}
+
+/* Tiles are links to the Calendar */
+a.tile {
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.photo-card {
+  touch-action: pan-y; /* sideways swipes go to the photo, up/down still scrolls */
+}
