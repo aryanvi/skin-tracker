@@ -1,7 +1,8 @@
-// The screen: day strip, streak, tiles, capture, calendar and photo viewer.
+// The screens: Today (day strip, streak, tiles, capture) and Calendar,
+// plus the review and photo viewer pop-ups.
 
 let startDate; // the first day the app was used, e.g. "2026-10-29"
-let entries = new Map(); // "2026-10-29" -> { date, photo, takenAt, url }
+let days = new Map(); // "2026-10-29" -> that day's photos, oldest first: [{ id, date, photo, takenAt, url }]
 let calendarView = loadCalendarView(); // "photos" or "lines"
 let calendarRange = "month"; // "month" (default) or "all"
 let shownMonth = null; // in "month" mode: { year, month }, starts at this month
@@ -18,10 +19,7 @@ async function init() {
     await setMeta("startDate", startDate);
   }
 
-  for (const entry of await getAllEntries()) {
-    entry.url = URL.createObjectURL(entry.photo);
-    entries.set(entry.date, entry);
-  }
+  for (const photo of await getAllPhotos()) addToDays(photo);
 
   // Ask the browser not to clear our data when space runs low
   if (navigator.storage && navigator.storage.persist) {
@@ -30,6 +28,14 @@ async function init() {
 
   showScreen();
   render();
+}
+
+function addToDays(photo) {
+  photo.url = URL.createObjectURL(photo.photo);
+  const list = days.get(photo.date) || [];
+  list.push(photo);
+  list.sort((a, b) => a.takenAt - b.takenAt);
+  days.set(photo.date, list);
 }
 
 // ---------- Screens ----------
@@ -63,7 +69,7 @@ function render() {
     day: "numeric",
     month: "long",
   });
-  $("camera-label").textContent = entries.has(today) ? "Retake today's photo" : "Log a breakout";
+  $("camera-label").textContent = days.has(today) ? "Add another photo" : "Log a breakout";
   renderDayStrip();
   renderStreak();
   renderCalendar();
@@ -80,7 +86,7 @@ function renderDayStrip() {
     const date = fromKey(key);
     const li = document.createElement("li");
     const tracked = key >= startDate;
-    const breakout = entries.has(key);
+    const breakout = days.has(key);
     if (key === today) li.classList.add("today");
     if (!tracked) li.classList.add("untracked");
 
@@ -98,9 +104,9 @@ function renderDayStrip() {
 
 function renderStreak() {
   const today = todayKey();
-  const { current, best } = computeStreaks(startDate, entries);
+  const { current, best } = computeStreaks(startDate, days);
   const now = fromKey(today);
-  const month = monthCounts(now.getFullYear(), now.getMonth(), startDate, entries);
+  const month = monthCounts(now.getFullYear(), now.getMonth(), startDate, days);
 
   $("streak-number").textContent = current;
   $("streak-label").textContent =
@@ -116,7 +122,7 @@ function renderStreak() {
 
 // ---------- Taking a photo: review first, then save ----------
 
-// Both camera inputs (main button and Retake) work the same way
+// All camera inputs (Today button, nav button and Retake) work the same way
 for (const input of document.querySelectorAll(".camera-input")) {
   input.addEventListener("change", async () => {
     const file = input.files[0];
@@ -137,17 +143,14 @@ for (const input of document.querySelectorAll(".camera-input")) {
   });
 }
 
+// Save adds the photo to today. Earlier photos from today are kept.
 $("review-save").addEventListener("click", async () => {
   if (!pendingPhoto) return;
-  const date = todayKey();
-  const entry = { date, photo: pendingPhoto.blob, takenAt: Date.now() };
-  await saveEntry(entry);
-
-  const old = entries.get(date);
-  if (old) URL.revokeObjectURL(old.url);
-  entry.url = pendingPhoto.url; // the saved entry now owns this URL
-  entries.set(date, entry);
+  const photo = { date: todayKey(), photo: pendingPhoto.blob, takenAt: Date.now() };
+  photo.id = await addPhoto(photo);
+  URL.revokeObjectURL(pendingPhoto.url);
   pendingPhoto = null;
+  addToDays(photo);
 
   $("review").close();
   render();
@@ -239,7 +242,7 @@ function renderMonth(year, month, today, withArrows = false) {
   const section = document.createElement("section");
   section.className = "month";
 
-  const counts = monthCounts(year, month, startDate, entries, today);
+  const counts = monthCounts(year, month, startDate, days, today);
   const title = new Date(year, month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const summary = `${counts.breakouts} breakout${counts.breakouts === 1 ? "" : "s"} · ${counts.clear} clear`;
   const head = withArrows
@@ -280,16 +283,24 @@ function renderMonth(year, month, today, withArrows = false) {
       cell.classList.add("none");
       cell.disabled = true;
       cell.setAttribute("aria-label", `${day}: not tracked`);
-    } else if (entries.has(key)) {
+    } else if (days.has(key)) {
+      const photos = days.get(key);
       cell.classList.add("breakout");
       if (calendarView === "photos") {
-        cell.style.backgroundImage = `url(${entries.get(key).url})`;
+        cell.style.backgroundImage = `url(${photos[photos.length - 1].url})`; // latest photo
+        if (photos.length > 1) {
+          const count = document.createElement("span");
+          count.className = "count";
+          count.textContent = photos.length;
+          cell.appendChild(count);
+        }
       } else {
         // Join the line to breakout days next to it in the same week row
-        if (weekday > 0 && day > 1 && entries.has(addDays(key, -1))) cell.classList.add("join-left");
-        if (weekday < 6 && day < daysInMonth && entries.has(addDays(key, 1))) cell.classList.add("join-right");
+        if (weekday > 0 && day > 1 && days.has(addDays(key, -1))) cell.classList.add("join-left");
+        if (weekday < 6 && day < daysInMonth && days.has(addDays(key, 1))) cell.classList.add("join-right");
       }
-      cell.setAttribute("aria-label", `${day}: breakout, view photo`);
+      const label = photos.length === 1 ? "1 photo" : `${photos.length} photos`;
+      cell.setAttribute("aria-label", `${day}: breakout, ${label}`);
       cell.addEventListener("click", () => openViewer(key));
     } else {
       cell.classList.add("clear");
@@ -353,18 +364,44 @@ function loadCalendarView() {
 // ---------- Photo viewer ----------
 
 let viewerDate = null;
+let viewerIndex = 0; // which of the day's photos is showing
 
+// Opens a day's photos, starting with the latest
 function openViewer(date) {
   viewerDate = date;
-  const d = fromKey(date);
+  viewerIndex = days.get(date).length - 1;
+  showViewerPhoto();
+  $("viewer").showModal();
+}
+
+function showViewerPhoto() {
+  const photos = days.get(viewerDate);
+  const photo = photos[viewerIndex];
+  const d = fromKey(viewerDate);
+  const time = new Date(photo.takenAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
   $("viewer-day").textContent = d.getDate();
   $("viewer-month").textContent =
     d.toLocaleDateString(undefined, { weekday: "short" }) + " · " +
-    d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  $("viewer-photo").src = entries.get(date).url;
+    d.toLocaleDateString(undefined, { month: "long", year: "numeric" }) + " · " + time;
+  $("viewer-photo").src = photo.url;
+
+  $("viewer-pager").hidden = photos.length < 2;
+  $("viewer-count").textContent = `${viewerIndex + 1} of ${photos.length}`;
+  $("viewer-prev").disabled = viewerIndex === 0;
+  $("viewer-next").disabled = viewerIndex === photos.length - 1;
   disarmDelete();
-  $("viewer").showModal();
 }
+
+$("viewer-prev").addEventListener("click", () => {
+  viewerIndex--;
+  showViewerPhoto();
+});
+
+$("viewer-next").addEventListener("click", () => {
+  viewerIndex++;
+  showViewerPhoto();
+});
 
 function disarmDelete() {
   $("viewer-delete").textContent = "Delete";
@@ -373,7 +410,8 @@ function disarmDelete() {
 
 $("viewer-close").addEventListener("click", () => $("viewer").close());
 
-// Delete needs two taps, so a photo isn't removed by accident
+// Delete needs two taps, so a photo isn't removed by accident.
+// It removes only the photo showing; the day's other photos stay.
 $("viewer-delete").addEventListener("click", async () => {
   const button = $("viewer-delete");
   if (!button.classList.contains("armed")) {
@@ -381,10 +419,18 @@ $("viewer-delete").addEventListener("click", async () => {
     button.classList.add("armed");
     return;
   }
-  await deleteEntry(viewerDate);
-  URL.revokeObjectURL(entries.get(viewerDate).url);
-  entries.delete(viewerDate);
-  $("viewer").close();
+  const photos = days.get(viewerDate);
+  await deletePhoto(photos[viewerIndex].id);
+  const [removed] = photos.splice(viewerIndex, 1);
+  URL.revokeObjectURL(removed.url);
+
+  if (photos.length === 0) {
+    days.delete(viewerDate);
+    $("viewer").close();
+  } else {
+    viewerIndex = Math.min(viewerIndex, photos.length - 1);
+    showViewerPhoto();
+  }
   render();
 });
 

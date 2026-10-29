@@ -17,12 +17,12 @@ A private, on-device web app for tracking skin over time. Full requirements are 
 - No medical advice or skin scores. Keep wording gentle. No emoji in the UI; use inline SVG line icons.
 
 ## Product decision
-Option B (breakout days only): a photo is taken only on a breakout day, and a day without a photo counts as clear. The streak is the number of clear days in a row.
+Option B (breakout days only): photos are taken only on breakout days (any number per day), and a day without a photo counts as clear. The streak is the number of clear days in a row.
 
 ## Project layout
 - `index.html`, `style.css`: page and styles
 - `app.js`: screen logic (streak, capture, calendar, viewer). There are two screens, Today and Calendar, chosen by the URL hash (`#today`, `#calendar`) and switched with the floating nav bar. The Calendar screen has two switches. Photos | Lines (Lines = an orange line under breakout days, no photos) is remembered in localStorage. Month | All defaults to one month with arrows and resets each time the screen opens; All stacks months newest-first.
-- `db.js`: IndexedDB storage (`entries` keyed by "YYYY-MM-DD", `meta` holds `startDate`)
+- `db.js`: IndexedDB storage, version 2. `photos` (auto id, indexed by `date`) allows any number of photos per day; `meta` holds `startDate`. The old v1 `entries` store (one photo per day) is kept untouched as a backup. Remove it in v3 only after export/import exists. The version history is at the top of the file.
 - `dates.js`: date helpers and streak maths; it must stay loadable in Node for tests
 - `tests/`: `node --test` tests for `dates.js`
 - `fonts/`: bundled Instrument Serif 400 (headings) and Inconsolata 500 (body), with their OFL licences

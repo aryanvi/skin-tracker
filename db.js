@@ -3,18 +3,50 @@
 // Nothing in this file talks to the internet.
 
 const DB_NAME = "skin-tracker";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+
+// Version history:
+//   1: "entries", one photo per day, keyed by date
+//   2: "photos", any number of photos per day, each with its own id.
+//      Version 1 photos are copied in. "entries" is left untouched as a
+//      backup until export exists, then it can be removed in version 3.
 
 function openDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    // Runs only the first time, to create the "tables"
-    request.onupgradeneeded = () => {
+
+    // Runs when the database is new or older than DB_VERSION.
+    // It all happens in one transaction: if anything fails, nothing changes.
+    request.onupgradeneeded = (event) => {
       const db = request.result;
-      db.createObjectStore("entries", { keyPath: "date" }); // one breakout photo per day
-      db.createObjectStore("meta"); // small settings, like the day tracking started
+      const tx = request.transaction;
+
+      if (event.oldVersion < 1) {
+        db.createObjectStore("entries", { keyPath: "date" });
+        db.createObjectStore("meta"); // small settings, like the day tracking started
+      }
+
+      if (event.oldVersion < 2) {
+        const photos = db.createObjectStore("photos", { keyPath: "id", autoIncrement: true });
+        photos.createIndex("date", "date");
+
+        // Copy every version 1 photo into the new store
+        tx.objectStore("entries").openCursor().onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (!cursor) return;
+          const { date, photo, takenAt } = cursor.value;
+          photos.add({ date, photo, takenAt });
+          cursor.continue();
+        };
+      }
     };
-    request.onsuccess = () => resolve(request.result);
+
+    request.onsuccess = () => {
+      const db = request.result;
+      // If a newer version of the app opens in another tab, step aside
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -32,16 +64,17 @@ async function run(storeName, mode, action) {
   });
 }
 
-function saveEntry(entry) {
-  return run("entries", "readwrite", (store) => store.put(entry));
+// Saves a photo { date, photo, takenAt } and returns its new id
+function addPhoto(photo) {
+  return run("photos", "readwrite", (store) => store.add(photo));
 }
 
-function getAllEntries() {
-  return run("entries", "readonly", (store) => store.getAll());
+function getAllPhotos() {
+  return run("photos", "readonly", (store) => store.getAll());
 }
 
-function deleteEntry(date) {
-  return run("entries", "readwrite", (store) => store.delete(date));
+function deletePhoto(id) {
+  return run("photos", "readwrite", (store) => store.delete(id));
 }
 
 function getMeta(key) {

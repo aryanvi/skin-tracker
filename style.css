@@ -450,6 +450,7 @@ button.nav:disabled {
 }
 
 .day {
+  position: relative;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -700,6 +701,54 @@ button.nav:disabled {
 
 .photo-date .micro {
   color: var(--ink);
+}
+
+/* "1 of 3" with arrows, top of the photo */
+.photo-pager {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, .78);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.photo-pager[hidden] {
+  display: none;
+}
+
+.photo-pager .micro {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+}
+
+.photo-pager button.nav {
+  width: 32px;
+  height: 32px;
+  background: none;
+}
+
+/* Calendar: how many photos a day has, when it's more than one */
+.day .count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: #fff;
+  font-size: 10px;
+  line-height: 18px;
+  text-shadow: none;
 }
 
 /* ---------- Gentle motion, switched off for Reduce Motion ---------- */

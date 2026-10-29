@@ -100,6 +100,16 @@
   <dialog id="viewer" class="sheet-dialog">
     <div class="photo-card">
       <img id="viewer-photo" class="photo" alt="Breakout photo">
+      <!-- Only shown when a day has more than one photo -->
+      <div class="photo-pager" id="viewer-pager">
+        <button class="nav" id="viewer-prev" aria-label="Previous photo">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <span class="micro" id="viewer-count"></span>
+        <button class="nav" id="viewer-next" aria-label="Next photo">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
       <div class="photo-date">
         <span class="display" id="viewer-day"></span>
         <span class="micro" id="viewer-month"></span>
