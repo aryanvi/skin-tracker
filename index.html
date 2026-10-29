@@ -10,58 +10,71 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Top: sunset gradient with the date and the last 7 days -->
-  <header class="hero">
-    <p class="micro" id="today-label"></p>
-    <h1>Today</h1>
-    <ol class="day-strip" id="day-strip" aria-label="Last 7 days"></ol>
-  </header>
+  <!-- ===== Screen 1: Today ===== -->
+  <div id="screen-today" class="screen">
+    <!-- Top: sunset gradient with the date and the last 7 days -->
+    <header class="hero">
+      <p class="micro" id="today-label"></p>
+      <h1>Today</h1>
+      <ol class="day-strip" id="day-strip" aria-label="Last 7 days"></ol>
+    </header>
 
-  <!-- White sheet that rises over the gradient -->
-  <main class="sheet">
-    <section class="streak" aria-live="polite">
-      <p class="micro">Current streak</p>
-      <div class="streak-number display" id="streak-number">0</div>
-      <p class="streak-label" id="streak-label">days clear</p>
-    </section>
+    <!-- White sheet that rises over the gradient -->
+    <main class="sheet">
+      <section class="streak" aria-live="polite">
+        <p class="micro">Current streak</p>
+        <div class="streak-number display" id="streak-number">0</div>
+        <p class="streak-label" id="streak-label">days clear</p>
+      </section>
 
-    <div class="tiles">
-      <div class="tile"><span class="micro">Best streak</span><strong id="tile-best">0</strong></div>
-      <div class="tile"><span class="micro">Clear this month</span><strong id="tile-clear">0</strong></div>
-      <div class="tile"><span class="micro">Breakouts this month</span><strong id="tile-breakouts">0</strong></div>
-    </div>
+      <div class="tiles">
+        <div class="tile"><span class="micro">Best streak</span><strong id="tile-best">0</strong></div>
+        <div class="tile"><span class="micro">Clear this month</span><strong id="tile-clear">0</strong></div>
+        <div class="tile"><span class="micro">Breakouts this month</span><strong id="tile-breakouts">0</strong></div>
+      </div>
 
-    <!-- On a phone, capture="user" opens the front (selfie) camera -->
-    <label class="button primary capture">
+      <!-- On a phone, capture="user" opens the front (selfie) camera -->
+      <label class="button primary capture">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span id="camera-label">Log a breakout</span>
+        <input class="camera-input" type="file" accept="image/*" capture="user" hidden>
+      </label>
+
+      <p class="footnote">Photos are saved only on this phone. Nothing is uploaded.</p>
+    </main>
+  </div>
+
+  <!-- ===== Screen 2: Calendar ===== -->
+  <div id="screen-calendar" class="screen" hidden>
+    <header class="page-head">
+      <p class="micro" id="since-label"></p>
+      <h1>Calendar</h1>
+      <!-- Switch between the photo calendar and the plain one with lines -->
+      <div class="segmented" role="group" aria-label="Calendar view">
+        <button data-view="photos">Photos</button>
+        <button data-view="lines">Lines</button>
+      </div>
+    </header>
+
+    <main class="page">
+      <div id="legend" class="legend micro"></div>
+      <div id="months"></div>
+    </main>
+  </div>
+
+  <!-- ===== Floating nav bar ===== -->
+  <nav class="tabbar" aria-label="Screens">
+    <a href="#today" class="tab" data-screen="today" aria-label="Today">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></svg>
+    </a>
+    <label class="tab-camera" aria-label="Log a breakout">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-      <span id="camera-label">Log a breakout</span>
       <input class="camera-input" type="file" accept="image/*" capture="user" hidden>
     </label>
-
-    <!-- Calendar -->
-    <section class="card calendar">
-      <div class="cal-header">
-        <button id="prev-month" class="nav" aria-label="Previous month">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-        </button>
-        <h2 id="month-title"></h2>
-        <button id="next-month" class="nav" aria-label="Next month">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
-        </button>
-      </div>
-      <div class="cal-grid weekdays micro" aria-hidden="true">
-        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-      </div>
-      <div id="calendar" class="cal-grid"></div>
-      <div class="legend micro">
-        <span><i class="key clear"></i>Clear</span>
-        <span><i class="key breakout"></i>Breakout</span>
-        <span><i class="key none"></i>Not tracked</span>
-      </div>
-    </section>
-
-    <p class="footnote">Photos are saved only on this phone. Nothing is uploaded.</p>
-  </main>
+    <a href="#calendar" class="tab" data-screen="calendar" aria-label="Calendar">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>
+    </a>
+  </nav>
 
   <!-- After taking a photo: look at it, then retake or save -->
   <dialog id="review" class="sheet-dialog">

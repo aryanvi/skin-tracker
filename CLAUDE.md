@@ -21,7 +21,7 @@ Option B (breakout days only): a photo is taken only on a breakout day, and a da
 
 ## Project layout
 - `index.html`, `style.css`: page and styles
-- `app.js`: screen logic (streak, capture, calendar, viewer)
+- `app.js`: screen logic (streak, capture, calendar, viewer). There are two screens, Today and Calendar, chosen by the URL hash (`#today`, `#calendar`) and switched with the floating nav bar. The Calendar screen stacks months newest-first and has a Photos | Lines switch (Lines = an orange line under breakout days, no photos), remembered in localStorage.
 - `db.js`: IndexedDB storage (`entries` keyed by "YYYY-MM-DD", `meta` holds `startDate`)
 - `dates.js`: date helpers and streak maths; it must stay loadable in Node for tests
 - `tests/`: `node --test` tests for `dates.js`

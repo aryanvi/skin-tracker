@@ -2,7 +2,7 @@
 
 let startDate; // the first day the app was used, e.g. "2026-10-29"
 let entries = new Map(); // "2026-10-29" -> { date, photo, takenAt, url }
-let shownMonth = new Date(); // which month the calendar is showing
+let calendarView = loadCalendarView(); // "photos" or "lines"
 let pendingPhoto = null; // a photo taken but not saved yet: { blob, url }
 
 const $ = (id) => document.getElementById(id);
@@ -26,8 +26,27 @@ async function init() {
     navigator.storage.persist();
   }
 
+  showScreen();
   render();
 }
+
+// ---------- Screens ----------
+
+// The address decides the screen: …/#calendar shows the calendar,
+// anything else shows Today. This makes the phone's back gesture work.
+function showScreen() {
+  const name = location.hash === "#calendar" ? "calendar" : "today";
+  for (const screen of document.querySelectorAll(".screen")) {
+    screen.hidden = screen.id !== `screen-${name}`;
+  }
+  for (const tab of document.querySelectorAll(".tab")) {
+    if (tab.dataset.screen === name) tab.setAttribute("aria-current", "page");
+    else tab.removeAttribute("aria-current");
+  }
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener("hashchange", showScreen);
 
 function render() {
   const today = todayKey();
@@ -123,7 +142,6 @@ $("review-save").addEventListener("click", async () => {
   pendingPhoto = null;
 
   $("review").close();
-  shownMonth = new Date();
   render();
 });
 
@@ -166,18 +184,57 @@ function shrinkPhoto(file, maxSize = 1200) {
 
 // ---------- Calendar ----------
 
+// Every month since tracking started, newest at the top
 function renderCalendar() {
-  const year = shownMonth.getFullYear();
-  const month = shownMonth.getMonth();
   const today = todayKey();
+  const now = fromKey(today);
+  const start = fromKey(startDate);
 
-  $("month-title").textContent = shownMonth.toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
+  $("since-label").textContent =
+    "Since " + start.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
 
-  const grid = $("calendar");
-  grid.innerHTML = "";
+  for (const button of document.querySelectorAll(".segmented button")) {
+    button.setAttribute("aria-pressed", button.dataset.view === calendarView);
+  }
+
+  $("legend").innerHTML =
+    calendarView === "photos"
+      ? `<span><i class="key clear"></i>Clear</span><span><i class="key breakout"></i>Breakout</span><span><i class="key none"></i>Not tracked</span>`
+      : `<span><i class="key line"></i>Breakout</span>`;
+
+  const months = $("months");
+  months.className = calendarView;
+  months.innerHTML = "";
+
+  let year = now.getFullYear();
+  let month = now.getMonth();
+  while (year > start.getFullYear() || (year === start.getFullYear() && month >= start.getMonth())) {
+    months.appendChild(renderMonth(year, month, today));
+    month--;
+    if (month < 0) {
+      month = 11;
+      year--;
+    }
+  }
+}
+
+function renderMonth(year, month, today) {
+  const section = document.createElement("section");
+  section.className = "month";
+
+  const counts = monthCounts(year, month, startDate, entries, today);
+  const title = new Date(year, month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  section.innerHTML = `
+    <div class="month-head">
+      <h2>${title}</h2>
+      <span class="micro">${counts.breakouts} breakout${counts.breakouts === 1 ? "" : "s"} · ${counts.clear} clear</span>
+    </div>
+    <div class="cal-grid weekdays micro" aria-hidden="true">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+    </div>`;
+
+  const grid = document.createElement("div");
+  grid.className = "cal-grid";
 
   // Empty boxes before the 1st, so it lands under the right weekday (Monday first)
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
@@ -188,6 +245,7 @@ function renderCalendar() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   for (let day = 1; day <= daysInMonth; day++) {
     const key = toKey(new Date(year, month, day));
+    const weekday = (firstWeekday + day - 1) % 7; // 0 = Monday, 6 = Sunday
     const cell = document.createElement("button");
     cell.className = "day";
     cell.textContent = day;
@@ -198,7 +256,13 @@ function renderCalendar() {
       cell.setAttribute("aria-label", `${day}: not tracked`);
     } else if (entries.has(key)) {
       cell.classList.add("breakout");
-      cell.style.backgroundImage = `url(${entries.get(key).url})`;
+      if (calendarView === "photos") {
+        cell.style.backgroundImage = `url(${entries.get(key).url})`;
+      } else {
+        // Join the line to breakout days next to it in the same week row
+        if (weekday > 0 && day > 1 && entries.has(addDays(key, -1))) cell.classList.add("join-left");
+        if (weekday < 6 && day < daysInMonth && entries.has(addDays(key, 1))) cell.classList.add("join-right");
+      }
       cell.setAttribute("aria-label", `${day}: breakout, view photo`);
       cell.addEventListener("click", () => openViewer(key));
     } else {
@@ -211,21 +275,28 @@ function renderCalendar() {
     grid.appendChild(cell);
   }
 
-  // Don't let the calendar go before the start month or past this month
-  const monthKey = toKey(new Date(year, month, 1)).slice(0, 7);
-  $("prev-month").disabled = monthKey <= startDate.slice(0, 7);
-  $("next-month").disabled = monthKey >= today.slice(0, 7);
+  section.appendChild(grid);
+  return section;
 }
 
-$("prev-month").addEventListener("click", () => {
-  shownMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() - 1, 1);
-  renderCalendar();
-});
+// Photos | Lines switch. The choice is remembered on this phone.
+for (const button of document.querySelectorAll(".segmented button")) {
+  button.addEventListener("click", () => {
+    calendarView = button.dataset.view;
+    try {
+      localStorage.setItem("calendarView", calendarView);
+    } catch {}
+    renderCalendar();
+  });
+}
 
-$("next-month").addEventListener("click", () => {
-  shownMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + 1, 1);
-  renderCalendar();
-});
+function loadCalendarView() {
+  try {
+    return localStorage.getItem("calendarView") === "lines" ? "lines" : "photos";
+  } catch {
+    return "photos";
+  }
+}
 
 // ---------- Photo viewer ----------
 
