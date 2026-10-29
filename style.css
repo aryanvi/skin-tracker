@@ -151,8 +151,8 @@ p {
   margin-top: var(--s1);
 }
 
-/* Day strip: today on the left, older days to the right, swipe left to go back.
-   The day in the left-hand spot grows; app.js sets --t from 0 (far) to 1 (in the spot). */
+/* Day strip: older days on the left, today on the right, swipe right to go back.
+   The day in the right-hand spot grows; app.js sets --t from 0 (far) to 1 (in the spot). */
 .day-strip {
   list-style: none;
   display: flex;
@@ -162,33 +162,33 @@ p {
   padding: var(--s6) 0 var(--s1);
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  scroll-padding-left: var(--gutter);
+  scroll-padding-right: var(--gutter);
   scrollbar-width: none;
-  /* Older days fade out towards the right edge; newer days you've swiped
-     past fade out at the left edge instead of being cut off */
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--gutter), #000 80%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 var(--gutter), #000 80%, transparent);
+  /* Older days fade out towards the left edge; newer days you've swiped
+     past fade out at the right edge instead of being cut off */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 calc(100% - var(--gutter)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 20%, #000 calc(100% - var(--gutter)), transparent);
 }
 
 .day-strip::-webkit-scrollbar {
   display: none;
 }
 
-/* Space before the first day lines it up with the page edge.
-   Space after the last day lets even the oldest day reach the left-hand spot. */
+/* Space before the first day lets even the oldest day reach the right-hand spot.
+   Space after today lines it up with the page edge. */
 .day-strip::before {
-  content: "";
-  flex: 0 0 var(--gutter);
-}
-
-.day-strip::after {
   content: "";
   flex: 0 0 calc(100% - 52px - var(--gutter));
 }
 
+.day-strip::after {
+  content: "";
+  flex: 0 0 var(--gutter);
+}
+
 .day-strip li {
   flex: 0 0 52px;
-  scroll-snap-align: start;
+  scroll-snap-align: end;
 }
 
 .strip-day {
@@ -227,12 +227,12 @@ p {
   color: rgba(17, 17, 17, .45);
 }
 
-/* Which day is in the middle; tap it to see that day's photos */
+/* Which day is in the spot; tap it to see that day's photos */
 .strip-caption {
   display: block;
-  align-self: flex-start; /* lines up on the left, under today */
+  align-self: flex-end; /* lines up on the right, under today */
   min-height: 32px;
-  margin: var(--s2) 0 0 calc(var(--s3) * -1); /* text starts at the page edge */
+  margin: var(--s2) calc(var(--s3) * -1) 0 0; /* text ends at the page edge */
   padding: var(--s2) var(--s3);
   border: none;
   border-radius: var(--radius-pill);

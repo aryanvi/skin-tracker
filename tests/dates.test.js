@@ -1,7 +1,7 @@
 // Run with: node --test
 const test = require("node:test");
 const assert = require("node:assert");
-const { addDays, computeStreaks, lastDays, monthCounts } = require("../dates.js");
+const { addDays, computeStreaks, lastDays, stripStart, monthCounts } = require("../dates.js");
 
 test("first day with no photo is a 1-day streak", () => {
   assert.deepStrictEqual(computeStreaks("2026-10-29", new Set(), "2026-10-29"), { current: 1, best: 1 });
@@ -39,4 +39,15 @@ test("monthCounts only counts tracked days", () => {
 
 test("monthCounts is zero for a month before tracking started", () => {
   assert.deepStrictEqual(monthCounts(2026, 8, "2026-10-20", new Set(), "2026-10-29"), { clear: 0, breakouts: 0 });
+});
+
+test("stripStart goes back to the 1st of the month", () => {
+  assert.strictEqual(stripStart("2026-10-29"), "2026-10-01");
+  assert.strictEqual(stripStart("2026-10-08"), "2026-10-01");
+});
+
+test("stripStart reaches into last month during the first week", () => {
+  assert.strictEqual(stripStart("2026-11-03"), "2026-10-01");
+  assert.strictEqual(stripStart("2026-11-07"), "2026-10-01");
+  assert.strictEqual(stripStart("2027-01-02"), "2026-12-01");
 });

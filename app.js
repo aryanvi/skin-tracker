@@ -126,17 +126,16 @@ function render() {
 
 // ---------- Day strip ----------
 
-let stripKey = null; // the day in the left-hand spot of the strip (null = today)
+let stripKey = null; // the day in the right-hand spot of the strip (null = today)
 
-// Every day since tracking started (at least the last 7).
-// Today is on the left and older days run to the right.
+// Every day from the 1st of the month (or last month, in the first week).
+// Older days are on the left and today is on the right.
 function renderDayStrip() {
   const today = todayKey();
   const strip = $("day-strip");
   strip.innerHTML = "";
 
-  const first = startDate < addDays(today, -6) ? startDate : addDays(today, -6);
-  for (let key = today; key >= first; key = addDays(key, -1)) {
+  for (let key = stripStart(today); key <= today; key = addDays(key, 1)) {
     const date = fromKey(key);
     const tracked = key >= startDate;
     const breakout = days.has(key);
@@ -152,7 +151,7 @@ function renderDayStrip() {
       <span class="num">${date.getDate()}</span>
       <span class="mark ${tracked ? (breakout ? "breakout" : "clear") : ""}"></span>`;
 
-    // Tap: bring the day to the left-hand spot, and open its photos if it has any
+    // Tap: bring the day to the right-hand spot, and open its photos if it has any
     button.addEventListener("click", () => {
       centreDay(key, true);
       if (breakout) openViewer(key);
@@ -165,13 +164,15 @@ function renderDayStrip() {
   centreDay(stripKey || today, false);
 }
 
-// Scrolls the strip so a day sits in the left-hand spot
+// Scrolls the strip so a day sits in the right-hand spot.
+// Scrolled all the way right, today is in the spot; each older day is one step left.
 function centreDay(key, smooth) {
   const strip = $("day-strip");
-  const button = strip.querySelector(`[data-key="${key}"]`) || strip.querySelector(".strip-day");
+  const button = strip.querySelector(`[data-key="${key}"]`) || strip.lastElementChild?.firstElementChild;
   if (!button) return;
   const li = button.parentElement;
-  const target = li.offsetLeft - strip.firstElementChild.offsetLeft; // today's position is the spot
+  const maxScroll = strip.scrollWidth - strip.clientWidth;
+  const target = maxScroll - (strip.lastElementChild.offsetLeft - li.offsetLeft);
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (smooth && !reduceMotion) {
     glideStrip(target);
@@ -211,15 +212,17 @@ function stopGlide() {
 // If you touch the strip mid-glide, your finger wins
 $("day-strip").addEventListener("pointerdown", stopGlide, { passive: true });
 
-// Grows the day in the left-hand spot and steps the others down in size and
-// strength the further right they are, then updates the caption.
+// Grows the day in the right-hand spot and steps the others down in size and
+// strength the further left they are, then updates the caption.
 // Runs on every scroll frame, which is what makes the swipe feel alive.
 function updateStrip() {
   const strip = $("day-strip");
   if (!strip.clientWidth) return; // hidden (on another screen): nothing to measure
-  const firstLi = strip.firstElementChild;
-  if (!firstLi) return;
-  const spot = strip.scrollLeft + firstLi.offsetLeft + firstLi.offsetWidth / 2;
+  const lastLi = strip.lastElementChild;
+  if (!lastLi) return;
+  // Where today sits when scrolled all the way right, moved by how far we are from there
+  const maxScroll = strip.scrollWidth - strip.clientWidth;
+  const spot = lastLi.offsetLeft + lastLi.offsetWidth / 2 - (maxScroll - strip.scrollLeft);
   let nearest = null;
   let nearestT = -1;
 

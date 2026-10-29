@@ -47,6 +47,14 @@ function lastDays(n, today = todayKey()) {
   return days;
 }
 
+// The first day the Today strip shows: the 1st of this month, or the 1st of
+// last month during the first week, so there's always more than a week to swipe.
+function stripStart(today = todayKey()) {
+  const date = fromKey(today);
+  const monthsBack = date.getDate() <= 7 ? 1 : 0;
+  return toKey(new Date(date.getFullYear(), date.getMonth() - monthsBack, 1));
+}
+
 // Clear and breakout days in one month, counting only tracked days
 // (from the start date up to today). month is 0 for January.
 function monthCounts(year, month, startKey, breakoutDays, today = todayKey()) {
@@ -64,5 +72,5 @@ function monthCounts(year, month, startKey, breakoutDays, today = todayKey()) {
 
 // Lets Node load this file for testing. Browsers ignore it.
 if (typeof module !== "undefined") {
-  module.exports = { toKey, fromKey, addDays, todayKey, computeStreaks, lastDays, monthCounts };
+  module.exports = { toKey, fromKey, addDays, todayKey, computeStreaks, lastDays, stripStart, monthCounts };
 }
