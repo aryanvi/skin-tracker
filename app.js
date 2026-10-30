@@ -1,4 +1,4 @@
-// The screens: Today (day strip, streak, tiles, capture) and Calendar,
+// The screens: Today (day strip, streak or breakouts, capture) and Calendar,
 // plus the review and photo viewer pop-ups.
 
 let startDate; // the first day the app was used, e.g. "2026-10-29"
@@ -276,11 +276,11 @@ $("day-strip").addEventListener(
 
 $("strip-caption").addEventListener("click", () => openViewer($("strip-caption").dataset.key));
 
-// ---------- Streak and tiles ----------
+// ---------- Streak and breakouts ----------
 
 function renderStreak() {
   const today = todayKey();
-  const { current, best } = computeStreaks(startDate, days);
+  const { current } = computeStreaks(startDate, days);
   const now = fromKey(today);
   const month = monthCounts(now.getFullYear(), now.getMonth(), startDate, days);
 
@@ -299,10 +299,36 @@ function renderStreak() {
       : current === 1
         ? "day clear"
         : "days clear";
-  $("tile-best").textContent = best;
-  $("tile-clear").textContent = month.clear;
-  $("tile-breakouts").textContent = month.breakouts;
+
+  // The second number: breakout days this month, e.g. "Breakouts in October"
+  $("breakout-title").textContent = `Breakouts in ${now.toLocaleDateString(undefined, { month: "long" })}`;
+  $("breakout-number").textContent = month.breakouts;
+  $("breakout-label").textContent =
+    month.breakouts === 0 ? "No breakout days so far" : month.breakouts === 1 ? "breakout day" : "breakout days";
 }
+
+// Swiping between the two numbers lights up the matching dot
+const statTrack = $("stat-track");
+const statDots = [...document.querySelectorAll(".stat-dot")];
+
+statTrack.addEventListener(
+  "scroll",
+  () => {
+    const index = Math.round(statTrack.scrollLeft / statTrack.clientWidth);
+    statDots.forEach((dot, i) => {
+      if (i === index) dot.setAttribute("aria-current", "true");
+      else dot.removeAttribute("aria-current");
+    });
+  },
+  { passive: true }
+);
+
+statDots.forEach((dot, i) =>
+  dot.addEventListener("click", () => {
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    statTrack.scrollTo({ left: i * statTrack.clientWidth, behavior: reduceMotion ? "auto" : "smooth" });
+  })
+);
 
 // ---------- Taking a photo: review first, then save ----------
 

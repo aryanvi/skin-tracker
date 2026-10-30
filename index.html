@@ -30,18 +30,26 @@
 
     <!-- White sheet that rises over the gradient -->
     <main class="sheet">
-      <section class="streak" aria-live="polite">
-        <p class="micro">Current streak</p>
-        <div class="streak-number display" id="streak-number">0</div>
-        <p class="streak-label" id="streak-label">days clear</p>
+      <!-- One big number at a time: swipe sideways for the other -->
+      <section class="stats" aria-label="Your numbers">
+        <div class="stat-track" id="stat-track">
+          <div class="stat" aria-live="polite">
+            <p class="micro">Current streak</p>
+            <div class="streak-number display" id="streak-number">0</div>
+            <p class="streak-label" id="streak-label">days clear</p>
+          </div>
+          <div class="stat" aria-live="polite">
+            <p class="micro" id="breakout-title">Breakouts this month</p>
+            <div class="streak-number display" id="breakout-number">0</div>
+            <p class="streak-label" id="breakout-label">breakout days</p>
+          </div>
+        </div>
+        <!-- Which number is showing; tap a dot to switch -->
+        <div class="stat-dots" id="stat-dots">
+          <button class="stat-dot" aria-label="Show current streak" aria-current="true"></button>
+          <button class="stat-dot" aria-label="Show breakouts this month"></button>
+        </div>
       </section>
-
-      <!-- Tapping a tile opens the Calendar -->
-      <div class="tiles">
-        <a class="tile" href="#calendar"><span class="micro">Best streak</span><strong id="tile-best">0</strong></a>
-        <a class="tile" href="#calendar"><span class="micro">Clear this month</span><strong id="tile-clear">0</strong></a>
-        <a class="tile" href="#calendar"><span class="micro">Breakouts this month</span><strong id="tile-breakouts">0</strong></a>
-      </div>
 
       <!-- On a phone this offers Take Photo or Photo Library -->
       <label class="button primary capture" tabindex="0" role="button">
