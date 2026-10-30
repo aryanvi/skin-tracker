@@ -811,6 +811,7 @@ button.nav:disabled {
 
 .photo-date {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: var(--s1);
 }
@@ -999,6 +1000,12 @@ a.tile {
   cursor: pointer;
   transition: transform .15s ease;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Smaller + in the viewer, next to "1 of 2" */
+.add-photo.small {
+  flex: 0 0 40px;
+  height: 40px;
 }
 
 .add-photo:active {

@@ -50,6 +50,7 @@ function addToDays(photo) {
 function showScreen() {
   const name = location.hash === "#calendar" ? "calendar" : "today";
   // The phone's back gesture shouldn't leave a photo open over another screen
+  returnToViewer = null; // don't reopen a photo over the new screen
   for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
   for (const screen of document.querySelectorAll(".screen")) {
     screen.hidden = screen.id !== `screen-${name}`;
@@ -309,6 +310,15 @@ function renderStreak() {
 // Set when you choose "Add photo" on a clear day in the Calendar.
 let nextPhotoDate = null;
 
+// Set when a photo is added from the viewer's + button: once the review
+// closes (saved or not), the viewer opens again on that day.
+let returnToViewer = null; // { date, id } or null
+
+$("viewer-add").addEventListener("click", () => {
+  nextPhotoDate = viewerDate;
+  returnToViewer = { date: viewerDate, id: null };
+});
+
 // All photo inputs (Today button, Calendar + button and Retake) work the same way.
 // On a phone they offer Take Photo or Photo Library.
 for (const input of document.querySelectorAll(".camera-input")) {
@@ -316,6 +326,8 @@ for (const input of document.querySelectorAll(".camera-input")) {
     const file = input.files[0];
     input.value = ""; // so picking the same file again still works
     const isRetake = !!input.closest("#review");
+    const fromViewer = !!input.closest("#viewer");
+    if (!isRetake && !fromViewer) returnToViewer = null;
     if (!file) {
       if (!isRetake) nextPhotoDate = null;
       return;
@@ -340,6 +352,7 @@ for (const input of document.querySelectorAll(".camera-input")) {
       nextPhotoDate = null;
     }
     $("review-photo").src = pendingPhoto.url;
+    if (fromViewer) $("viewer").close(); // the review takes its place for a moment
     if (!$("review").open) $("review").showModal();
   });
 }
@@ -374,6 +387,7 @@ $("review-save").addEventListener("click", async () => {
   pendingPhoto = null;
   addToDays(photo);
 
+  if (returnToViewer) returnToViewer = { date, id: photo.id };
   $("review").close();
   render();
   if (date !== today) {
@@ -396,7 +410,19 @@ for (const label of document.querySelectorAll('label[role="button"]')) {
 }
 
 // Closing the review without saving (Cancel or swipe/Escape) throws the photo away
-$("review").addEventListener("close", discardPending);
+$("review").addEventListener("close", () => {
+  discardPending();
+  if (!returnToViewer) return;
+  const { date, id } = returnToViewer;
+  returnToViewer = null;
+  if (!days.has(date)) return;
+  openViewer(date);
+  const index = days.get(date).findIndex((photo) => photo.id === id);
+  if (index >= 0) {
+    viewerIndex = index;
+    showViewerPhoto();
+  }
+});
 
 function discardPending() {
   if (!pendingPhoto) return;
