@@ -37,14 +37,15 @@
       <!-- One big number at a time: swipe sideways for the other -->
       <section class="stats" aria-label="Your numbers">
         <div class="stat-track" id="stat-track">
-          <div class="stat" aria-live="polite">
+          <!-- Order: streak first, or breakouts first on a day you logged a breakout (app.js) -->
+          <div class="stat" id="stat-streak" aria-live="polite">
             <p class="micro">Current streak</p>
             <div class="streak-number display" id="streak-number">0</div>
             <p class="streak-label" id="streak-label">days clear</p>
             <!-- e.g. "Last breakout: Sat, Oct 24 · 6 days ago" -->
             <p class="last-breakout micro" id="last-breakout" hidden></p>
           </div>
-          <div class="stat" aria-live="polite">
+          <div class="stat" id="stat-breakouts" aria-live="polite">
             <p class="micro" id="breakout-title">Breakouts this month</p>
             <div class="streak-number display" id="breakout-number">0</div>
             <p class="streak-label" id="breakout-label">breakout days</p>
@@ -52,8 +53,8 @@
         </div>
         <!-- Which number is showing; tap a dot to switch -->
         <div class="stat-dots" id="stat-dots">
-          <button class="stat-dot" aria-label="Show current streak" aria-current="true"></button>
-          <button class="stat-dot" aria-label="Show breakouts this month"></button>
+          <button class="stat-dot" aria-current="true"></button>
+          <button class="stat-dot"></button>
         </div>
       </section>
 

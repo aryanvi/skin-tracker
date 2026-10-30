@@ -69,7 +69,10 @@ function showScreen() {
   }
   placeThumb();
   // The strip can only measure itself while it's on screen
-  if (name === "today" && startDate) centreDay(stripKey || todayKey(), false);
+  if (name === "today" && startDate) {
+    centreDay(stripKey || todayKey(), false);
+    if (breakoutFirst !== null) orderStats(breakoutFirst); // always open on the first number
+  }
   // Opening the calendar always starts on this month
   if (name === "calendar") {
     calendarRange = "month";
@@ -443,6 +446,9 @@ function renderStreak() {
         ? "day clear"
         : "days clear";
 
+  const first = breakouts.has(today);
+  if (first !== breakoutFirst) orderStats(first);
+
   // "Last breakout: Sat, Oct 24 · 6 days ago". Not needed when it was today.
   const last = lastBreakout(breakouts, today);
   const lastLine = $("last-breakout");
@@ -475,6 +481,20 @@ statTrack.addEventListener(
   },
   { passive: true }
 );
+
+// On a day you logged a breakout, the breakout number comes first;
+// otherwise the streak does. Runs when that changes and when Today opens.
+let breakoutFirst = null;
+function orderStats(first) {
+  breakoutFirst = first;
+  const [a, b] = first ? ["stat-breakouts", "stat-streak"] : ["stat-streak", "stat-breakouts"];
+  statTrack.append($(a), $(b));
+  statDots[0].setAttribute("aria-label", first ? "Show breakouts this month" : "Show current streak");
+  statDots[1].setAttribute("aria-label", first ? "Show current streak" : "Show breakouts this month");
+  statTrack.scrollLeft = 0;
+  statDots[0].setAttribute("aria-current", "true");
+  statDots[1].removeAttribute("aria-current");
+}
 
 statDots.forEach((dot, i) =>
   dot.addEventListener("click", () => {
