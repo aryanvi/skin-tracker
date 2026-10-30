@@ -24,8 +24,7 @@ function todayKey() {
 }
 
 // Walk every day from the start until today.
-// A day with a photo is a breakout day and resets the streak.
-// A day without a photo is a clear day and adds 1 to it.
+// A breakout day resets the streak; a clear day adds 1 to it.
 function computeStreaks(startKey, breakoutDays, today = todayKey()) {
   let current = 0;
   let best = 0;
@@ -38,6 +37,48 @@ function computeStreaks(startKey, breakoutDays, today = todayKey()) {
     }
   }
   return { current, best };
+}
+
+// Which days count as breakouts: a day with a photo, unless it was marked
+// clear. A day without a photo is always clear.
+// photoDates: dates that have photos; dayInfo: Map date -> { status, tags }
+function breakoutDays(photoDates, dayInfo = new Map()) {
+  const set = new Set();
+  for (const date of photoDates) {
+    const info = dayInfo.get(date);
+    if (!info || info.status !== "clear") set.add(date);
+  }
+  return set;
+}
+
+// The most recent breakout day up to today, or null if there's never been one
+function lastBreakout(breakouts, today = todayKey()) {
+  let latest = null;
+  for (const date of breakouts) {
+    if (date <= today && (!latest || date > latest)) latest = date;
+  }
+  return latest;
+}
+
+// For each tag: on how many days it was used, and on how many of those days
+// a breakout happened that day or within the next `windowDays` days.
+// Most-used first. Plain counts, no scores.
+function tagStats(dayInfo, breakouts, windowDays = 2) {
+  const stats = new Map();
+  for (const [date, info] of dayInfo) {
+    for (const tag of info.tags || []) {
+      const row = stats.get(tag) || { tag, days: 0, followed: 0 };
+      row.days++;
+      for (let i = 0; i <= windowDays; i++) {
+        if (breakouts.has(addDays(date, i))) {
+          row.followed++;
+          break;
+        }
+      }
+      stats.set(tag, row);
+    }
+  }
+  return [...stats.values()].sort((a, b) => b.days - a.days || a.tag.localeCompare(b.tag));
 }
 
 // The last n days, oldest first, ending today. Used for the day strip.
@@ -72,5 +113,5 @@ function monthCounts(year, month, startKey, breakoutDays, today = todayKey()) {
 
 // Lets Node load this file for testing. Browsers ignore it.
 if (typeof module !== "undefined") {
-  module.exports = { toKey, fromKey, addDays, todayKey, computeStreaks, lastDays, stripStart, monthCounts };
+  module.exports = { toKey, fromKey, addDays, todayKey, computeStreaks, lastDays, stripStart, monthCounts, breakoutDays, lastBreakout, tagStats };
 }

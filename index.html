@@ -21,6 +21,10 @@
   <div id="screen-today" class="screen">
     <!-- Top: sunset gradient with the date and the last 7 days -->
     <header class="hero">
+      <!-- Opens the Data screen -->
+      <a class="hero-icon" href="#data" aria-label="Your data">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19v-7M12 19V6M19 19v-4"/></svg>
+      </a>
       <p class="micro" id="today-label"></p>
       <h1>Today</h1>
       <!-- Swipe sideways through every day; the middle one grows -->
@@ -37,6 +41,8 @@
             <p class="micro">Current streak</p>
             <div class="streak-number display" id="streak-number">0</div>
             <p class="streak-label" id="streak-label">days clear</p>
+            <!-- e.g. "Last breakout: Sat, Oct 24 · 6 days ago" -->
+            <p class="last-breakout micro" id="last-breakout" hidden></p>
           </div>
           <div class="stat" aria-live="polite">
             <p class="micro" id="breakout-title">Breakouts this month</p>
@@ -89,22 +95,55 @@
             Lines
           </button>
         </div>
-        <label class="range-picker">
-          <span class="visually-hidden">Show</span>
-          <span id="range-label" aria-hidden="true">Month</span>
-          <!-- Invisible, on top of the label: tapping opens the phone's own picker -->
-          <select id="range">
-            <option value="month">Month</option>
-            <option value="all">All months</option>
-          </select>
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>
-        </label>
+        <div class="pickers">
+          <!-- Tag filter: rings the days with that tag -->
+          <label class="range-picker">
+            <span class="visually-hidden">Highlight tag</span>
+            <span id="tag-filter-label" aria-hidden="true">Tag</span>
+            <select id="tag-filter"></select>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>
+          </label>
+          <label class="range-picker">
+            <span class="visually-hidden">Show</span>
+            <span id="range-label" aria-hidden="true">Month</span>
+            <!-- Invisible, on top of the label: tapping opens the phone's own picker -->
+            <select id="range">
+              <option value="month">Month</option>
+              <option value="all">All months</option>
+            </select>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>
+          </label>
+        </div>
       </div>
     </header>
 
     <main class="page">
       <div id="months"></div>
       <div id="legend" class="legend micro"></div>
+    </main>
+  </div>
+
+  <!-- ===== Screen 3: Data (opened from the icon on Today, not in the nav) ===== -->
+  <div id="screen-data" class="screen" hidden>
+    <header class="page-head">
+      <a class="back-link" href="#today">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Today
+      </a>
+      <h1>Your data</h1>
+      <p class="micro" id="data-since"></p>
+    </header>
+    <main class="page data-page">
+      <section class="data-totals" id="data-totals"></section>
+      <section class="data-section">
+        <h2>Breakout days per month</h2>
+        <div id="data-chart"></div>
+      </section>
+      <section class="data-section">
+        <h2>Tags</h2>
+        <p class="data-note">How often a breakout came on a tagged day or in the 2 days after it. Tap a tag to see those days in the Calendar.</p>
+        <div id="data-tags"></div>
+      </section>
     </main>
   </div>
 
@@ -125,6 +164,8 @@
     </label>
     <h2>Keep this photo?</h2>
     <img id="review-photo" class="photo" alt="Photo you just took">
+    <!-- Breakout or clear skin, and tags (filled in by app.js) -->
+    <div class="tag-picker" id="review-tags"></div>
     <div class="dialog-buttons">
       <label class="button secondary" tabindex="0" role="button">
         Change
@@ -167,9 +208,39 @@
       </div>
       <img id="viewer-photo" class="photo" alt="Breakout photo">
     </div>
-    <div class="dialog-buttons">
+    <!-- The day's status and tags; changes save straight away -->
+    <div class="tag-picker" id="viewer-tags"></div>
+    <div class="dialog-buttons three">
       <button id="viewer-delete" class="button quiet">Delete</button>
+      <button id="viewer-compare" class="button secondary">Compare</button>
       <button id="viewer-close" class="button primary" autofocus>Close</button>
+    </div>
+  </dialog>
+
+  <!-- A day without photos: add tags or a photo -->
+  <dialog id="day-sheet" class="sheet-dialog">
+    <h2 id="day-sheet-title"></h2>
+    <p class="micro">Clear day</p>
+    <div class="tag-picker" id="day-sheet-tags"></div>
+    <div class="dialog-buttons">
+      <button id="day-sheet-photo" class="button secondary">Add photo</button>
+      <button id="day-sheet-done" class="button primary" autofocus>Done</button>
+    </div>
+  </dialog>
+
+  <!-- Compare: pick the second photo -->
+  <dialog id="compare-pick" class="sheet-dialog">
+    <h2>Compare with</h2>
+    <ul class="pick-list" id="compare-list"></ul>
+    <button id="compare-pick-close" class="text-button">Cancel</button>
+  </dialog>
+
+  <!-- Compare: two photos side by side -->
+  <dialog id="compare" class="compare-dialog" aria-label="Two photos side by side">
+    <button id="compare-close" class="compare-close">Close</button>
+    <div class="compare-pair">
+      <figure><img id="compare-a" alt="" draggable="false"><figcaption id="compare-a-date"></figcaption></figure>
+      <figure><img id="compare-b" alt="" draggable="false"><figcaption id="compare-b-date"></figcaption></figure>
     </div>
   </dialog>
 

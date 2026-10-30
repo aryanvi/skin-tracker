@@ -1,8 +1,13 @@
-// The screens: Today (day strip, streak or breakouts, capture) and Calendar,
-// plus the review and photo viewer pop-ups.
+// The screens: Today (day strip, streak or breakouts, capture), Calendar and
+// Data, plus the review, photo viewer, day sheet and compare pop-ups.
 
 let startDate; // the first day the app was used, e.g. "2026-10-29"
 let days = new Map(); // "2026-10-29" -> that day's photos, oldest first: [{ id, date, photo, takenAt, url }]
+let dayInfo = new Map(); // "2026-10-29" -> { date, tags: ["Stress"], status: "clear" } (only days with tags or marked clear)
+let breakouts = new Set(); // breakout days, worked out from photos and dayInfo by refreshBreakouts()
+let customTags = []; // tags you made yourself, added after the set list
+let calendarTag = ""; // the Calendar's tag filter ("" = off)
+let tagFromData = null; // a tag picked on the Data screen, applied when the Calendar opens
 let calendarView = loadCalendarView(); // "photos" or "lines"
 let calendarRange = "month"; // "month" (default) or "all"
 let shownMonth = null; // in "month" mode: { year, month }, starts at this month
@@ -20,6 +25,8 @@ async function init() {
   }
 
   for (const photo of await getAllPhotos()) addToDays(photo);
+  for (const info of await getAllDayInfo()) dayInfo.set(info.date, info);
+  customTags = (await getMeta("customTags")) || [];
 
   // Ask the browser not to clear our data when space runs low
   if (navigator.storage && navigator.storage.persist) {
@@ -45,10 +52,11 @@ function addToDays(photo) {
 
 // ---------- Screens ----------
 
-// The address decides the screen: …/#calendar shows the calendar,
-// anything else shows Today. This makes the phone's back gesture work.
+// The address decides the screen: …/#calendar shows the calendar, #data the
+// Data screen, anything else shows Today. This makes the phone's back gesture work.
 function showScreen() {
-  const name = location.hash === "#calendar" ? "calendar" : "today";
+  const name = { "#calendar": "calendar", "#data": "data" }[location.hash] || "today";
+  $("tabbar").hidden = name === "data"; // Data has its own back link instead
   // The phone's back gesture shouldn't leave a photo open over another screen
   returnToViewer = null; // don't reopen a photo over the new screen
   for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
@@ -66,8 +74,11 @@ function showScreen() {
   if (name === "calendar") {
     calendarRange = "month";
     shownMonth = null;
+    calendarTag = tagFromData || ""; // the tag filter starts off, unless you came from Data
+    tagFromData = null;
     if (startDate) renderCalendar();
   }
+  if (name === "data" && startDate) renderData();
   window.scrollTo(0, 0);
 }
 
@@ -117,7 +128,136 @@ $("toast-action").addEventListener("click", () => {
   if (toastRun) toastRun();
 });
 
+// ---------- Day tags and status ----------
+
+// The set list (no period tag: that's tracked in another app). Your own tags come after.
+const PRESET_TAGS = ["New product", "Stress", "Poor sleep", "Diet", "Travel", "Sun", "Makeup"];
+
+// e.g. "Sat, Oct 24"
+function shortDate(key) {
+  return fromKey(key).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+// Every tag to offer: the set list, your own, then any others already used (e.g. from a backup)
+function allTags() {
+  const tags = [...PRESET_TAGS, ...customTags];
+  for (const info of dayInfo.values()) {
+    for (const tag of info.tags || []) if (!tags.includes(tag)) tags.push(tag);
+  }
+  return tags;
+}
+
+// What the picker starts with for a day: its saved tags, and Breakout unless
+// a photo day was marked clear
+function stateForDay(date) {
+  const info = dayInfo.get(date);
+  return {
+    status: info && info.status === "clear" && days.has(date) ? "clear" : "breakout",
+    tags: new Set(info ? info.tags : []),
+  };
+}
+
+// Saves a day's tags and status. "Clear" is only stored for a day with photos,
+// since a day without photos is clear anyway.
+async function saveDayInfo(date, tags, status) {
+  const info = { date, tags: [...tags] };
+  if (status === "clear" && days.has(date)) info.status = "clear";
+  if (!info.tags.length && !info.status) {
+    await deleteDayInfo(date);
+    dayInfo.delete(date);
+  } else {
+    await putDayInfo(info);
+    dayInfo.set(date, info);
+  }
+}
+
+// Draws the tag picker: an optional Breakout / Clear skin switch, then a chip
+// for every tag (tap to turn on or off) and "+ Your own".
+// state = { status, tags: Set } is changed in place; onChange runs after each change.
+function renderTagPicker(container, state, options) {
+  const redraw = () => {
+    renderTagPicker(container, state, options);
+    options.onChange();
+  };
+  container.innerHTML = "";
+
+  if (options.withStatus) {
+    const choice = document.createElement("div");
+    choice.className = "status-switch";
+    choice.setAttribute("role", "radiogroup");
+    choice.setAttribute("aria-label", "How was your skin?");
+    for (const [value, label] of [["breakout", "Breakout"], ["clear", "Clear skin"]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", state.status === value);
+      button.dataset.status = value;
+      button.textContent = label;
+      button.addEventListener("click", () => {
+        if (state.status === value) return;
+        state.status = value;
+        redraw();
+      });
+      choice.appendChild(button);
+    }
+    container.appendChild(choice);
+  }
+
+  const chips = document.createElement("div");
+  chips.className = "chips";
+  chips.setAttribute("role", "group");
+  chips.setAttribute("aria-label", "Tags");
+  for (const tag of allTags()) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip";
+    chip.textContent = tag;
+    chip.setAttribute("aria-pressed", state.tags.has(tag));
+    chip.addEventListener("click", () => {
+      if (state.tags.has(tag)) state.tags.delete(tag);
+      else state.tags.add(tag);
+      redraw();
+    });
+    chips.appendChild(chip);
+  }
+
+  // "+ Your own" turns into a small text field
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "chip add";
+  add.textContent = "+ Your own";
+  add.addEventListener("click", () => {
+    const form = document.createElement("form");
+    form.className = "chip-form";
+    form.innerHTML = `<input type="text" maxlength="24" placeholder="New tag" aria-label="New tag" enterkeyhint="done"><button class="chip" type="submit">Add</button>`;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const typed = form.querySelector("input").value.trim().replace(/\s+/g, " ");
+      if (!typed) return renderTagPicker(container, state, options);
+      // Reuse an existing tag if it's the same word in different capitals
+      let tag = allTags().find((t) => t.toLowerCase() === typed.toLowerCase());
+      if (!tag) {
+        tag = typed;
+        customTags.push(tag);
+        setMeta("customTags", customTags).catch(() => {});
+      }
+      state.tags.add(tag);
+      redraw();
+    });
+    add.replaceWith(form);
+    form.querySelector("input").focus();
+  });
+  chips.appendChild(add);
+  container.appendChild(chips);
+}
+
+// A day is a breakout if it has a photo, unless it was marked clear
+function refreshBreakouts() {
+  breakouts = breakoutDays(days.keys(), dayInfo);
+}
+
 function render() {
+  refreshBreakouts();
   const today = todayKey();
   $("today-label").textContent = fromKey(today).toLocaleDateString(undefined, {
     weekday: "long",
@@ -128,6 +268,7 @@ function render() {
   renderDayStrip();
   renderStreak();
   renderCalendar();
+  if (location.hash === "#data") renderData();
 }
 
 // ---------- Day strip ----------
@@ -144,7 +285,8 @@ function renderDayStrip() {
   for (let key = stripStart(today); key <= today; key = addDays(key, 1)) {
     const date = fromKey(key);
     const tracked = key >= startDate;
-    const breakout = days.has(key);
+    const breakout = breakouts.has(key);
+    const hasPhotos = days.has(key);
     const status = !tracked ? "not tracked" : breakout ? "breakout" : "clear";
 
     const li = document.createElement("li");
@@ -160,7 +302,7 @@ function renderDayStrip() {
     // Tap: bring the day to the right-hand spot, and open its photos if it has any
     button.addEventListener("click", () => {
       centreDay(key, true);
-      if (breakout) openViewer(key);
+      if (hasPhotos) openViewer(key);
     });
 
     li.appendChild(button);
@@ -256,7 +398,8 @@ function updateStrip() {
   if (key < startDate) {
     caption.textContent = `${label} · Not tracked`;
   } else if (photos) {
-    caption.textContent = `${label} · Breakout · ${photos.length} photo${photos.length === 1 ? "" : "s"}`;
+    const status = breakouts.has(key) ? "Breakout" : "Clear";
+    caption.textContent = `${label} · ${status} · ${photos.length} photo${photos.length === 1 ? "" : "s"}`;
   } else {
     caption.textContent = `${label} · Clear`;
   }
@@ -280,9 +423,9 @@ $("strip-caption").addEventListener("click", () => openViewer($("strip-caption")
 
 function renderStreak() {
   const today = todayKey();
-  const { current } = computeStreaks(startDate, days);
+  const { current } = computeStreaks(startDate, breakouts);
   const now = fromKey(today);
-  const month = monthCounts(now.getFullYear(), now.getMonth(), startDate, days);
+  const month = monthCounts(now.getFullYear(), now.getMonth(), startDate, breakouts);
 
   // Bounce the number when it changes (not on first load)
   const number = $("streak-number");
@@ -299,6 +442,16 @@ function renderStreak() {
       : current === 1
         ? "day clear"
         : "days clear";
+
+  // "Last breakout: Sat, Oct 24 · 6 days ago". Not needed when it was today.
+  const last = lastBreakout(breakouts, today);
+  const lastLine = $("last-breakout");
+  lastLine.hidden = !last || last === today;
+  if (last && last !== today) {
+    const ago = Math.round((now - fromKey(last)) / 86400000);
+    const when = ago === 1 ? "yesterday" : `${ago} days ago`;
+    lastLine.textContent = `Last breakout: ${shortDate(last)} · ${when}`;
+  }
 
   // The second number: breakout days this month, e.g. "Breakouts in October"
   $("breakout-title").textContent = `Breakouts in ${now.toLocaleDateString(undefined, { month: "long" })}`;
@@ -340,6 +493,9 @@ let nextPhotoDate = null;
 // closes (saved or not), the viewer opens again on that day.
 let returnToViewer = null; // { date, id } or null
 
+// The status and tags chosen in the review, saved along with the photo
+let reviewState = { status: "breakout", tags: new Set() };
+
 $("viewer-add").addEventListener("click", () => {
   nextPhotoDate = viewerDate;
   returnToViewer = { date: viewerDate, id: null };
@@ -376,6 +532,9 @@ for (const input of document.querySelectorAll(".camera-input")) {
     if (!isRetake) {
       dateInput.value = nextPhotoDate || todayKey();
       nextPhotoDate = null;
+      // Breakout is picked to start with; the day's tags so far are kept
+      reviewState = stateForDay(dateInput.value);
+      renderTagPicker($("review-tags"), reviewState, { withStatus: true, onChange() {} });
     }
     $("review-photo").src = pendingPhoto.url;
     if (fromViewer) $("viewer").close(); // the review takes its place for a moment
@@ -412,6 +571,11 @@ $("review-save").addEventListener("click", async () => {
   URL.revokeObjectURL(pendingPhoto.url);
   pendingPhoto = null;
   addToDays(photo);
+  try {
+    await saveDayInfo(date, reviewState.tags, reviewState.status);
+  } catch {
+    toast("The photo is saved, but its tags couldn't be. Try adding them again.");
+  }
 
   if (returnToViewer) returnToViewer = { date, id: photo.id };
   $("review").close();
@@ -499,13 +663,22 @@ function renderCalendar() {
   $("range").value = calendarRange;
   $("range-label").textContent = calendarRange === "month" ? "Month" : "All months";
 
+  // Tag filter: "Tag" when off, the tag's name when on
+  const filter = $("tag-filter");
+  filter.innerHTML = "";
+  filter.add(new Option("No tag", ""));
+  for (const tag of allTags()) filter.add(new Option(tag, tag));
+  filter.value = calendarTag;
+  $("tag-filter-label").textContent = calendarTag || "Tag";
+
   $("legend").innerHTML =
-    calendarView === "photos"
+    (calendarView === "photos"
       ? `<span><i class="key clear"></i>Clear</span><span><i class="key breakout"></i>Breakout</span><span><i class="key none"></i>Not tracked</span>`
-      : `<span><i class="key line"></i>Breakout</span>`;
+      : `<span><i class="key line"></i>Breakout</span>`) +
+    (calendarTag ? `<span><i class="key ring"></i>${escapeHtml(calendarTag)}</span>` : `<span><i class="key dot"></i>Tagged</span>`);
 
   const months = $("months");
-  months.className = calendarView;
+  months.className = calendarView + (calendarTag ? " filtering" : ""); // filtering fades untagged days
   months.innerHTML = "";
 
   if (calendarRange === "month") {
@@ -536,7 +709,7 @@ function renderMonth(year, month, today, withArrows = false) {
   const section = document.createElement("section");
   section.className = "month";
 
-  const counts = monthCounts(year, month, startDate, days, today);
+  const counts = monthCounts(year, month, startDate, breakouts, today);
   const title = new Date(year, month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const summary = `${counts.breakouts} breakout${counts.breakouts === 1 ? "" : "s"} · ${counts.clear} clear`;
   const head = withArrows
@@ -581,8 +754,10 @@ function renderMonth(year, month, today, withArrows = false) {
       cell.disabled = true;
       cell.setAttribute("aria-label", `${day}: not tracked`);
     } else if (days.has(key)) {
+      // A photo day: breakout, or clear if it was marked so
       const photos = days.get(key);
-      cell.classList.add("breakout");
+      const breakout = breakouts.has(key);
+      cell.classList.add(breakout ? "breakout" : "clear", "has-photo");
       if (calendarView === "photos") {
         cell.style.backgroundImage = `url(${photos[photos.length - 1].url})`; // latest photo
         if (photos.length > 1) {
@@ -591,28 +766,29 @@ function renderMonth(year, month, today, withArrows = false) {
           count.textContent = photos.length;
           cell.appendChild(count);
         }
-      } else {
+      } else if (breakout) {
         // Join the line to breakout days next to it in the same week row
-        if (weekday > 0 && day > 1 && days.has(addDays(key, -1))) cell.classList.add("join-left");
-        if (weekday < 6 && day < daysInMonth && days.has(addDays(key, 1))) cell.classList.add("join-right");
+        if (weekday > 0 && day > 1 && breakouts.has(addDays(key, -1))) cell.classList.add("join-left");
+        if (weekday < 6 && day < daysInMonth && breakouts.has(addDays(key, 1))) cell.classList.add("join-right");
       }
       const label = photos.length === 1 ? "1 photo" : `${photos.length} photos`;
-      cell.setAttribute("aria-label", `${day}: breakout, ${label}`);
+      cell.setAttribute("aria-label", `${day}: ${breakout ? "breakout" : "clear"}, ${label}`);
       cell.addEventListener("click", () => openViewer(key));
     } else {
       cell.classList.add("clear");
       cell.setAttribute("aria-label", `${day}: clear`);
-      cell.addEventListener("click", () => {
-        const label = fromKey(key).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-        toast(`${label} · Clear day`, {
-          label: "Add photo",
-          run: () => {
-            nextPhotoDate = key;
-            $("calendar-camera").click();
-          },
-        });
-      });
+      cell.addEventListener("click", () => openDaySheet(key));
     }
+
+    // Tagged days get a small dot; with the tag filter on, its days get a ring
+    const tags = (dayInfo.get(key) || {}).tags || [];
+    if (tags.length && !cell.disabled) {
+      const dot = document.createElement("span");
+      dot.className = "tag-dot";
+      cell.appendChild(dot);
+      cell.setAttribute("aria-label", `${cell.getAttribute("aria-label")}, tagged ${tags.join(", ")}`);
+    }
+    if (calendarTag && tags.includes(calendarTag)) cell.classList.add("tagged");
     if (key === today) cell.classList.add("today");
 
     grid.appendChild(cell);
@@ -654,6 +830,48 @@ function moveMonth(step) {
 $("range").addEventListener("change", () => {
   calendarRange = $("range").value;
   renderCalendar();
+});
+
+// Tag filter. Also not remembered.
+$("tag-filter").addEventListener("change", () => {
+  calendarTag = $("tag-filter").value;
+  renderCalendar();
+});
+
+// Tag names are your own words, so they're escaped before going into HTML
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+// ---------- Day sheet: a day without photos ----------
+
+let sheetDate = null;
+
+function openDaySheet(date) {
+  sheetDate = date;
+  $("day-sheet-title").textContent = fromKey(date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const state = stateForDay(date);
+  renderTagPicker($("day-sheet-tags"), state, {
+    withStatus: false,
+    async onChange() {
+      try {
+        await saveDayInfo(date, state.tags, "breakout");
+      } catch {
+        toast("Couldn't save the tags. Please try again.");
+      }
+      render();
+    },
+  });
+  $("day-sheet").showModal();
+}
+
+$("day-sheet-done").addEventListener("click", () => $("day-sheet").close());
+closeOnOutsideTap($("day-sheet"));
+
+$("day-sheet-photo").addEventListener("click", () => {
+  $("day-sheet").close();
+  nextPhotoDate = sheetDate;
+  $("calendar-camera").click();
 });
 
 // Photos | Lines switch. The choice is remembered on this phone.
@@ -700,13 +918,28 @@ function showViewerPhoto() {
   $("viewer-day").textContent = d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
   $("viewer-month").textContent = d.getFullYear() + time;
   $("viewer-photo").src = photo.url;
-  $("focus-photo").src = photo.url; // keeps full screen in step when swiping
+  if (!focusSingle) $("focus-photo").src = photo.url; // keeps full screen in step when swiping
 
   $("viewer-pager").hidden = photos.length < 2;
   $("viewer-count").textContent = `${viewerIndex + 1} of ${photos.length}`;
   $("viewer-prev").disabled = viewerIndex === 0;
   $("viewer-next").disabled = viewerIndex === photos.length - 1;
   disarmDelete();
+
+  // The day's status and tags. Changes save straight away.
+  const date = viewerDate;
+  const state = stateForDay(date);
+  renderTagPicker($("viewer-tags"), state, {
+    withStatus: true,
+    async onChange() {
+      try {
+        await saveDayInfo(date, state.tags, state.status);
+      } catch {
+        toast("Couldn't save that change. Please try again.");
+      }
+      render();
+    },
+  });
 }
 
 // Move to the previous (-1) or next (1) photo of the day, sliding it in
@@ -764,12 +997,84 @@ function onTapOrSwipe(element, onTap, onSwipe) {
   });
 }
 
+// Full screen shows either the viewer's photo (swipe for the day's others)
+// or one photo from Compare (no swiping)
+let focusSingle = false;
+
 // Viewer photo: tap for full screen, swipe for the day's other photos
-onTapOrSwipe($("viewer-photo"), () => $("focus").showModal(), stepViewer);
+onTapOrSwipe(
+  $("viewer-photo"),
+  () => {
+    focusSingle = false;
+    $("focus-photo").src = $("viewer-photo").src;
+    $("focus").showModal();
+  },
+  stepViewer
+);
 $("viewer-photo").draggable = false;
 
 // Full screen: tap anywhere to go back, swipe for the day's other photos
-onTapOrSwipe($("focus"), () => $("focus").close(), stepViewer);
+onTapOrSwipe($("focus"), () => $("focus").close(), (step) => {
+  if (!focusSingle) stepViewer(step);
+});
+
+// ---------- Compare two photos ----------
+
+// Lists every other photo, newest first, to pick the second one
+$("viewer-compare").addEventListener("click", () => {
+  const current = days.get(viewerDate)[viewerIndex];
+  const others = [...days.values()].flat().filter((photo) => photo !== current);
+  if (!others.length) {
+    toast("Add another photo first, then you can compare.");
+    return;
+  }
+  others.sort((a, b) => b.takenAt - a.takenAt);
+
+  const list = $("compare-list");
+  list.innerHTML = "";
+  for (const photo of others) {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.className = "pick";
+    button.innerHTML = `
+      <img src="${photo.url}" alt="">
+      <span><span class="pick-date">${shortDate(photo.date)}</span>
+      <span class="micro">${fromKey(photo.date).getFullYear()} · ${breakouts.has(photo.date) ? "Breakout" : "Clear"}</span></span>`;
+    button.addEventListener("click", () => {
+      $("compare-pick").close();
+      openCompare(current, photo);
+    });
+    item.appendChild(button);
+    list.appendChild(item);
+  }
+  $("compare-pick").showModal();
+});
+
+$("compare-pick-close").addEventListener("click", () => $("compare-pick").close());
+closeOnOutsideTap($("compare-pick"));
+
+// Two photos side by side, the older one on the left
+function openCompare(a, b) {
+  const [left, right] = a.takenAt <= b.takenAt ? [a, b] : [b, a];
+  for (const [side, photo] of [["a", left], ["b", right]]) {
+    const date = fromKey(photo.date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    $(`compare-${side}`).src = photo.url;
+    $(`compare-${side}`).alt = `Photo from ${date}`;
+    $(`compare-${side}-date`).textContent = date;
+  }
+  $("compare").showModal();
+}
+
+// Tap either photo to see it full screen
+for (const side of ["a", "b"]) {
+  $(`compare-${side}`).addEventListener("click", () => {
+    focusSingle = true;
+    $("focus-photo").src = $(`compare-${side}`).src;
+    $("focus").showModal();
+  });
+}
+
+$("compare-close").addEventListener("click", () => $("compare").close());
 
 // Tapping the dark area outside a pop-up closes it
 function closeOnOutsideTap(dialog) {
@@ -820,6 +1125,103 @@ $("viewer-delete").addEventListener("click", async () => {
   render();
 });
 
+// ---------- Data screen ----------
+// Plain counts only: no scores, no advice.
+
+function renderData() {
+  const today = todayKey();
+  $("data-since").textContent =
+    "Since " + fromKey(startDate).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+
+  // Totals
+  const tracked = Math.round((fromKey(today) - fromKey(startDate)) / 86400000) + 1;
+  const breakoutCount = [...breakouts].filter((date) => date >= startDate && date <= today).length;
+  const { best } = computeStreaks(startDate, breakouts, today);
+  $("data-totals").innerHTML = [
+    [tracked, tracked === 1 ? "day tracked" : "days tracked"],
+    [breakoutCount, breakoutCount === 1 ? "breakout day" : "breakout days"],
+    [best, "longest clear run"],
+  ]
+    .map(([n, label]) => `<div class="data-total"><strong class="display">${n}</strong><span class="micro">${label}</span></div>`)
+    .join("");
+
+  renderMonthChart(today);
+
+  // Tags, most used first
+  const rows = tagStats(dayInfo, breakouts);
+  const list = $("data-tags");
+  list.innerHTML = "";
+  if (!rows.length) {
+    list.innerHTML = `<p class="data-empty">No tags yet. Add them when you save a photo, or tap a clear day in the Calendar.</p>`;
+    return;
+  }
+  for (const row of rows) {
+    const button = document.createElement("button");
+    button.className = "tag-row";
+    button.innerHTML = `
+      <span class="tag-row-name">${escapeHtml(row.tag)}</span>
+      <span class="micro">${row.days} day${row.days === 1 ? "" : "s"} tagged · ${row.followed} with a breakout within 2 days</span>
+      <span class="tag-row-bar" aria-hidden="true"><i style="width:${(row.followed / row.days) * 100}%"></i></span>`;
+    button.setAttribute("aria-label", `${row.tag}: tagged on ${row.days} days, a breakout came on or within 2 days after ${row.followed} of them. Show in Calendar.`);
+    button.addEventListener("click", () => {
+      tagFromData = row.tag;
+      location.hash = "#calendar";
+    });
+    list.appendChild(button);
+  }
+}
+
+// Breakout days in each of the last 6 months (fewer when tracking started
+// more recently), as thin bars (inline SVG)
+function renderMonthChart(today) {
+  const now = fromKey(today);
+  const months = [];
+  // Only months since tracking started, so an untracked month never shows as 0
+  const start = fromKey(startDate);
+  const span = (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth();
+  for (let i = Math.min(5, span); i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const counts = monthCounts(d.getFullYear(), d.getMonth(), startDate, breakouts, today);
+    months.push({ label: d.toLocaleDateString(undefined, { month: "short" }), full: d.toLocaleDateString(undefined, { month: "long", year: "numeric" }), value: counts.breakouts });
+  }
+  const max = Math.max(1, ...months.map((m) => m.value));
+  const width = 320;
+  const height = 140;
+  const top = 20; // room for the numbers above the bars
+  const base = height - 24; // room for the month names below
+  const slot = width / months.length;
+  const bar = 20;
+
+  const bars = months
+    .map((m, i) => {
+      const x = i * slot + (slot - bar) / 2;
+      const h = m.value ? Math.max(4, ((base - top) * m.value) / max) : 0;
+      const y = base - h;
+      // Rounded top, flat bottom on the baseline
+      const path = h
+        ? `M${x},${base} V${y + 4} Q${x},${y} ${x + 4},${y} H${x + bar - 4} Q${x + bar},${y} ${x + bar},${y + 4} V${base} Z`
+        : "";
+      return `<g>
+        <title>${m.full}: ${m.value} breakout day${m.value === 1 ? "" : "s"}</title>
+        <rect x="${i * slot}" y="0" width="${slot}" height="${height}" fill="transparent"/>
+        ${path ? `<path d="${path}" class="chart-bar"/>` : ""}
+        <text x="${x + bar / 2}" y="${y - 6}" class="chart-value">${m.value}</text>
+        <text x="${x + bar / 2}" y="${height - 6}" class="chart-label">${m.label}</text>
+      </g>`;
+    })
+    .join("");
+
+  $("data-chart").innerHTML = `
+    <svg class="month-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Breakout days in each month">
+      <line x1="0" x2="${width}" y1="${base}" y2="${base}" class="chart-axis"/>
+      ${bars}
+    </svg>
+    <table class="visually-hidden">
+      <caption>Breakout days per month</caption>
+      ${months.map((m) => `<tr><th>${m.full}</th><td>${m.value}</td></tr>`).join("")}
+    </table>`;
+}
+
 // ---------- Backup ----------
 // A backup is one zip file made on the phone: data.json (dates and times)
 // plus every photo. Nothing is uploaded; you choose where the file goes.
@@ -853,7 +1255,16 @@ async function makeBackupFile() {
       files.push({ name: file, bytes: new Uint8Array(await photo.arrayBuffer()) });
     }
   }
-  const data = { app: "skin-tracker", version: 1, exportedAt: Date.now(), startDate, photos };
+  // Version 2 adds each day's tags and status, and your own tag words
+  const data = {
+    app: "skin-tracker",
+    version: 2,
+    exportedAt: Date.now(),
+    startDate,
+    photos,
+    dayInfo: [...dayInfo.values()],
+    customTags,
+  };
   files.unshift({ name: "data.json", bytes: encoder.encode(JSON.stringify(data, null, 2)) });
   return new File([makeZip(files)], `skin-tracker-backup-${todayKey()}.zip`, { type: "application/zip" });
 }
@@ -941,6 +1352,22 @@ $("backup-import").addEventListener("change", async (event) => {
       addToDays(photo);
       added++;
     }
+
+    // Tags are added to the ones already here, never removed. A day marked
+    // clear here stays clear; one marked clear in the backup becomes clear.
+    const isTag = (tag) => typeof tag === "string" && tag.trim() && tag.length <= 40;
+    for (const item of Array.isArray(data.dayInfo) ? data.dayInfo : []) {
+      if (!item || !isDate(item.date)) continue;
+      const here = dayInfo.get(item.date);
+      const tags = new Set(here ? here.tags : []);
+      for (const tag of Array.isArray(item.tags) ? item.tags : []) if (isTag(tag)) tags.add(tag);
+      const status = (here && here.status) || (item.status === "clear" ? "clear" : undefined);
+      await saveDayInfo(item.date, tags, status);
+    }
+    for (const tag of Array.isArray(data.customTags) ? data.customTags : []) {
+      if (isTag(tag) && !PRESET_TAGS.includes(tag) && !customTags.includes(tag)) customTags.push(tag);
+    }
+    await setMeta("customTags", customTags);
 
     // Tracking starts on the earliest day from either place
     const earliest = [startDate, isDate(data.startDate) ? data.startDate : null, ...days.keys()]

@@ -3,13 +3,15 @@
 // Nothing in this file talks to the internet.
 
 const DB_NAME = "skin-tracker";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // Version history:
 //   1: "entries", one photo per day, keyed by date
 //   2: "photos", any number of photos per day, each with its own id.
 //      Version 1 photos are copied in. "entries" is left untouched as a
-//      backup until export exists, then it can be removed in version 3.
+//      backup. (Export now exists, so it could be removed in a later version.)
+//   3: "dayInfo", one record per day that has tags or was marked clear:
+//      { date, tags: [...], status: "clear" }. Only adds a store; photos are untouched.
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -38,6 +40,10 @@ function openDb() {
           photos.add({ date, photo, takenAt });
           cursor.continue();
         };
+      }
+
+      if (event.oldVersion < 3) {
+        db.createObjectStore("dayInfo", { keyPath: "date" });
       }
     };
 
@@ -75,6 +81,19 @@ function getAllPhotos() {
 
 function deletePhoto(id) {
   return run("photos", "readwrite", (store) => store.delete(id));
+}
+
+// Tags and status for one day: { date, tags, status }
+function getAllDayInfo() {
+  return run("dayInfo", "readonly", (store) => store.getAll());
+}
+
+function putDayInfo(info) {
+  return run("dayInfo", "readwrite", (store) => store.put(info));
+}
+
+function deleteDayInfo(date) {
+  return run("dayInfo", "readwrite", (store) => store.delete(date));
 }
 
 function getMeta(key) {

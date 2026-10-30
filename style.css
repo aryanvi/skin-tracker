@@ -1155,3 +1155,457 @@ button.nav:active:not(:disabled),
 .backup-dialog .button:disabled {
   opacity: .6;
 }
+
+/* ---------- Tags, status, compare and data ---------- */
+
+/* The nav is hidden on the Data screen (it has a back link instead) */
+.tabbar[hidden] {
+  display: none;
+}
+
+/* Round icon in the top-right of the Today gradient: opens Data */
+.hero > .hero-icon {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--s4));
+  right: var(--gutter);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .45);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s ease;
+}
+
+.hero > .hero-icon:active {
+  transform: scale(.92);
+}
+
+/* "Last breakout: Sat, Oct 24 · 6 days ago" under the streak */
+.last-breakout {
+  margin-top: var(--s3);
+}
+
+/* Pop-ups can grow taller than the screen now, so they scroll */
+.sheet-dialog {
+  overflow-y: auto;
+}
+
+#review .photo,
+#viewer .photo {
+  max-height: 44dvh;
+}
+
+.tag-picker {
+  margin-top: var(--s4);
+  text-align: left;
+}
+
+/* Breakout / Clear skin: two halves, the chosen one is white */
+.status-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s1);
+  padding: var(--s1);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.status-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 40px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color .2s ease, color .2s ease;
+}
+
+/* A small dot in the Calendar's colour for each choice */
+.status-switch button::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--orange);
+}
+
+.status-switch [data-status="clear"]::before {
+  background: var(--blue);
+}
+
+.status-switch [aria-checked="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-soft);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+.chip {
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform .15s ease;
+}
+
+.chip:active {
+  transform: scale(.95);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--ink);
+  color: #fff;
+}
+
+.chip.add {
+  background: none;
+  border: 1px dashed var(--ink-muted);
+  color: var(--ink-muted);
+}
+
+.chip-form {
+  display: inline-flex;
+  gap: var(--s1);
+}
+
+.chip-form input {
+  width: 140px;
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: 16px; /* 16px stops iPhone zooming in */
+}
+
+/* Delete | Compare | Close */
+.dialog-buttons.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.dialog-buttons.three .button {
+  padding: 0 var(--s2);
+}
+
+/* Calendar: a photo day marked clear keeps its photo, with a blue ring */
+.day.clear.has-photo {
+  color: #fff;
+  box-shadow: inset 0 0 0 2px var(--blue);
+  text-shadow: 0 0 4px rgba(0, 0, 0, .7);
+  cursor: pointer;
+}
+
+.lines .day.clear.has-photo {
+  color: var(--ink);
+  box-shadow: none;
+  text-shadow: none;
+}
+
+/* Small dot under the number on a tagged day */
+.day .tag-dot {
+  position: absolute;
+  bottom: 12%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 1.5px #fff;
+}
+
+.lines .day .tag-dot {
+  bottom: auto;
+  top: 10%;
+}
+
+/* Tag filter on: tagged days get a ring, the rest fade back */
+.filtering .day:not(.tagged):not(.none) {
+  opacity: .3;
+}
+
+.day.tagged {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink);
+}
+
+.lines .day.tagged {
+  border-radius: 8px;
+}
+
+.key.dot {
+  width: 6px;
+  height: 6px;
+  background: var(--ink);
+  vertical-align: 1px;
+}
+
+.key.ring {
+  background: none;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+/* Tag and Month pickers side by side */
+.pickers {
+  display: flex;
+  gap: var(--s1);
+}
+
+/* Compare: list of photos to pick from */
+.pick-list {
+  max-height: 60dvh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  text-align: left;
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: var(--s2);
+  border: none;
+  border-radius: 14px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick:active {
+  background: var(--surface-2);
+}
+
+.pick img {
+  width: 48px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.pick > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+
+.pick-date {
+  font-family: var(--font-heading);
+  font-size: 20px;
+}
+
+/* Compare: two photos side by side on a dark background */
+.compare-dialog {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: calc(env(safe-area-inset-top) + var(--s7)) var(--s3) calc(env(safe-area-inset-bottom) + var(--s4));
+  border: none;
+  background: transparent;
+  color: #fff;
+}
+
+.compare-dialog[open] {
+  display: grid;
+  place-items: center;
+  animation: focus-in .3s cubic-bezier(.2, .9, .3, 1);
+}
+
+.compare-dialog::backdrop {
+  background: rgba(10, 10, 10, .92);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.compare-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--s3));
+  right: var(--s3);
+  min-height: 36px;
+  padding: 0 var(--s4);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.compare-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s2);
+  width: 100%;
+  max-width: 720px;
+}
+
+.compare-pair figure {
+  margin: 0;
+}
+
+.compare-pair img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 16px;
+  background: #222;
+  cursor: zoom-in;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.compare-pair figcaption {
+  margin-top: var(--s2);
+  font-size: 13px;
+  text-align: center;
+  opacity: .8;
+}
+
+/* ---------- Data screen ---------- */
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-left: calc(var(--s1) * -1);
+  color: var(--ink-muted);
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.back-link .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.data-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s3);
+  margin-top: var(--s5);
+}
+
+.data-total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+
+.data-total strong {
+  font-weight: 400;
+  font-size: 44px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-section {
+  margin-top: var(--s6);
+}
+
+.data-section h2 {
+  font-size: 26px;
+  margin-bottom: var(--s2);
+}
+
+.data-note,
+.data-empty {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.month-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: var(--s3);
+}
+
+.chart-bar {
+  fill: var(--orange);
+}
+
+.chart-axis {
+  stroke: var(--surface-2);
+  stroke-width: 1;
+}
+
+.chart-value,
+.chart-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+.chart-value {
+  fill: var(--ink);
+}
+
+.chart-label {
+  fill: var(--ink-muted);
+}
+
+.tag-row {
+  display: grid;
+  gap: var(--s1);
+  width: 100%;
+  padding: var(--s3) 0;
+  border: none;
+  border-bottom: 1px solid var(--surface-2);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tag-row-name {
+  font-family: var(--font-heading);
+  font-size: 22px;
+}
+
+/* How many of the tagged days had a breakout within 2 days */
+.tag-row-bar {
+  height: 4px;
+  margin-top: var(--s1);
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.tag-row-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--orange);
+}

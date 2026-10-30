@@ -1,7 +1,7 @@
 // Run with: node --test
 const test = require("node:test");
 const assert = require("node:assert");
-const { addDays, computeStreaks, lastDays, stripStart, monthCounts } = require("../dates.js");
+const { addDays, computeStreaks, lastDays, stripStart, monthCounts, breakoutDays, lastBreakout, tagStats } = require("../dates.js");
 
 test("first day with no photo is a 1-day streak", () => {
   assert.deepStrictEqual(computeStreaks("2026-10-29", new Set(), "2026-10-29"), { current: 1, best: 1 });
@@ -50,4 +50,30 @@ test("stripStart reaches into last month during the first week", () => {
   assert.strictEqual(stripStart("2026-11-03"), "2026-10-01");
   assert.strictEqual(stripStart("2026-11-07"), "2026-10-01");
   assert.strictEqual(stripStart("2027-01-02"), "2026-12-01");
+});
+
+test("a photo day marked clear isn't a breakout", () => {
+  const info = new Map([["2026-10-21", { status: "clear", tags: [] }]]);
+  const breakouts = breakoutDays(["2026-10-20", "2026-10-21"], info);
+  assert.deepStrictEqual([...breakouts], ["2026-10-20"]);
+  // so it doesn't reset the streak: clear from the 21st to the 23rd
+  assert.strictEqual(computeStreaks("2026-10-19", breakouts, "2026-10-23").current, 3);
+});
+
+test("lastBreakout finds the most recent one, or null", () => {
+  assert.strictEqual(lastBreakout(new Set(["2026-10-02", "2026-10-24", "2026-10-11"]), "2026-10-30"), "2026-10-24");
+  assert.strictEqual(lastBreakout(new Set(), "2026-10-30"), null);
+});
+
+test("tagStats counts tagged days and breakouts within the next 2 days", () => {
+  const info = new Map([
+    ["2026-10-30", { tags: ["Stress"] }], // breakout 2 days later, across the month end
+    ["2026-10-10", { tags: ["Stress", "Sun"] }], // breakout 3 days later: too far
+    ["2026-10-20", { tags: ["Sun"] }], // breakout the same day
+  ]);
+  const breakouts = new Set(["2026-11-01", "2026-10-13", "2026-10-20"]);
+  assert.deepStrictEqual(tagStats(info, breakouts), [
+    { tag: "Stress", days: 2, followed: 1 },
+    { tag: "Sun", days: 2, followed: 1 },
+  ]);
 });
