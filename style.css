@@ -779,9 +779,12 @@ button.nav:disabled {
   margin: var(--s1) 0 var(--s4);
 }
 
+/* Every photo sits in the same portrait frame (the shape of a phone photo),
+   so the card is the same size whatever the picture */
 .photo {
   display: block;
   width: 100%;
+  aspect-ratio: 3 / 4;
   max-height: 60dvh;
   object-fit: cover;
   border-radius: 20px;
@@ -795,48 +798,37 @@ button.nav:disabled {
   margin-top: var(--s4);
 }
 
-/* Viewer: big date numeral on the photo */
-.photo-card {
-  position: relative;
+/* Viewer: date and "1 of 3" in a row above the photo */
+.photo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-height: 48px;
+  margin-bottom: var(--s3);
+  text-align: left;
 }
 
 .photo-date {
-  position: absolute;
-  left: var(--s3);
-  bottom: var(--s3);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  padding: var(--s2) var(--s3);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .78);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  gap: var(--s1);
 }
 
-.photo-date .display {
-  font-size: 56px;
-  line-height: .9;
+.photo-day {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  line-height: 1.05;
 }
 
-.photo-date .micro {
-  color: var(--ink);
-}
-
-/* "1 of 3" with arrows, top of the photo */
 .photo-pager {
-  position: absolute;
-  top: var(--s3);
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--s1);
   padding: var(--s1);
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, .78);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  background: var(--surface-2);
 }
 
 .photo-pager[hidden] {

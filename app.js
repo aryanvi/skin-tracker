@@ -644,10 +644,9 @@ function showViewerPhoto() {
     ? ""
     : " · " + new Date(photo.takenAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
-  $("viewer-day").textContent = d.getDate();
-  $("viewer-month").textContent =
-    d.toLocaleDateString(undefined, { weekday: "short" }) + " · " +
-    d.toLocaleDateString(undefined, { month: "long", year: "numeric" }) + time;
+  // e.g. "Tuesday, October 20" and, below it, "2026 · 7:43 PM"
+  $("viewer-day").textContent = d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  $("viewer-month").textContent = d.getFullYear() + time;
   $("viewer-photo").src = photo.url;
   $("focus-photo").src = photo.url; // keeps full screen in step when swiping
 
