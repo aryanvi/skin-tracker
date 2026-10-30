@@ -1614,3 +1614,13 @@ button.nav:active:not(:disabled),
   border-radius: 2px;
   background: var(--orange);
 }
+
+/* A day opened from the Today strip pulses once in the Calendar */
+.day.pulse {
+  animation: day-pulse 1s ease-out 2;
+}
+
+@keyframes day-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(17, 17, 17, .45); }
+  100% { box-shadow: 0 0 0 10px rgba(17, 17, 17, 0); }
+}

@@ -8,6 +8,7 @@ let breakouts = new Set(); // breakout days, worked out from photos and dayInfo 
 let customTags = []; // tags you made yourself, added after the set list
 let calendarTag = ""; // the Calendar's tag filter ("" = off)
 let tagFromData = null; // a tag picked on the Data screen, applied when the Calendar opens
+let dayFromStrip = null; // a day tapped in the Today strip: the Calendar opens on it
 let calendarView = loadCalendarView(); // "photos" or "lines"
 let calendarRange = "month"; // "month" (default) or "all"
 let shownMonth = null; // in "month" mode: { year, month }, starts at this month
@@ -70,7 +71,7 @@ function showScreen() {
   placeThumb();
   // The strip can only measure itself while it's on screen
   if (name === "today" && startDate) {
-    centreDay(stripKey || todayKey(), false);
+    centreDay(stripKey || todayKey());
     if (breakoutFirst !== null) orderStats(breakoutFirst); // always open on the first number
   }
   // Opening the calendar always starts on this month
@@ -79,7 +80,14 @@ function showScreen() {
     shownMonth = null;
     calendarTag = tagFromData || ""; // the tag filter starts off, unless you came from Data
     tagFromData = null;
+    const focusDay = dayFromStrip;
+    dayFromStrip = null;
+    if (focusDay) {
+      const d = fromKey(focusDay);
+      shownMonth = { year: d.getFullYear(), month: d.getMonth() };
+    }
     if (startDate) renderCalendar();
+    if (focusDay) showDayInCalendar(focusDay);
   }
   if (name === "data" && startDate) renderData();
   window.scrollTo(0, 0);
@@ -104,7 +112,7 @@ document.fonts.ready.then(() => {
 });
 window.addEventListener("resize", () => {
   placeThumb();
-  if (startDate) centreDay(stripKey || todayKey(), false); // e.g. after turning the phone
+  if (startDate) centreDay(stripKey || todayKey()); // e.g. after turning the phone
 });
 
 // ---------- Short messages ----------
@@ -302,66 +310,30 @@ function renderDayStrip() {
       <span class="num">${date.getDate()}</span>
       <span class="mark ${tracked ? (breakout ? "breakout" : "clear") : ""}"></span>`;
 
-    // Tap: bring the day to the right-hand spot, and open its photos if it has any
+    // Tap: open that day in the Calendar (with its photo, if it has one)
     button.addEventListener("click", () => {
-      centreDay(key, true);
-      if (hasPhotos) openViewer(key);
+      dayFromStrip = key;
+      location.hash = "#calendar";
     });
 
     li.appendChild(button);
     strip.appendChild(li);
   }
 
-  centreDay(stripKey || today, false);
+  centreDay(stripKey || today);
 }
 
 // Scrolls the strip so a day sits in the right-hand spot.
 // Scrolled all the way right, today is in the spot; each older day is one step left.
-function centreDay(key, smooth) {
+function centreDay(key) {
   const strip = $("day-strip");
   const button = strip.querySelector(`[data-key="${key}"]`) || strip.lastElementChild?.firstElementChild;
   if (!button) return;
   const li = button.parentElement;
   const maxScroll = strip.scrollWidth - strip.clientWidth;
-  const target = maxScroll - (strip.lastElementChild.offsetLeft - li.offsetLeft);
-  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (smooth && !reduceMotion) {
-    glideStrip(target);
-  } else {
-    stopGlide();
-    strip.scrollLeft = target;
-    updateStrip();
-  }
+  strip.scrollLeft = maxScroll - (strip.lastElementChild.offsetLeft - li.offsetLeft);
+  updateStrip();
 }
-
-// Our own smooth scroll. The browser's built-in one sometimes gets skipped
-// when it clashes with snapping, so snapping is paused while this runs.
-let glideFrame = 0;
-function glideStrip(target) {
-  const strip = $("day-strip");
-  stopGlide();
-  const start = strip.scrollLeft;
-  const change = target - start;
-  if (!change) return;
-  const startTime = performance.now();
-  strip.style.scrollSnapType = "none";
-  const step = (now) => {
-    const progress = Math.min(1, (now - startTime) / 380);
-    const eased = 1 - (1 - progress) ** 3; // fast start, gentle stop
-    strip.scrollLeft = start + change * eased;
-    if (progress < 1) glideFrame = requestAnimationFrame(step);
-    else strip.style.scrollSnapType = "";
-  };
-  glideFrame = requestAnimationFrame(step);
-}
-
-function stopGlide() {
-  cancelAnimationFrame(glideFrame);
-  $("day-strip").style.scrollSnapType = "";
-}
-
-// If you touch the strip mid-glide, your finger wins
-$("day-strip").addEventListener("pointerdown", stopGlide, { passive: true });
 
 // Grows the day in the right-hand spot (the others stay small and faint),
 // then updates the caption.
@@ -768,6 +740,7 @@ function renderMonth(year, month, today, withArrows = false) {
     const weekday = (firstWeekday + day - 1) % 7; // 0 = Monday, 6 = Sunday
     const cell = document.createElement("button");
     cell.className = "day";
+    cell.dataset.key = key;
     cell.textContent = day;
 
     if (key > today) {
@@ -876,6 +849,14 @@ $("tag-filter").addEventListener("change", () => {
 // Tag names are your own words, so they're escaped before going into HTML
 function escapeHtml(text) {
   return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+// Coming from the Today strip: pulse the day, then open it like a tap would
+function showDayInCalendar(key) {
+  const cell = document.querySelector(`#months .day[data-key="${key}"]`);
+  if (cell) cell.classList.add("pulse");
+  if (days.has(key)) openViewer(key);
+  else if (key <= todayKey()) openDaySheet(key);
 }
 
 // ---------- Day sheet: a day without photos ----------
