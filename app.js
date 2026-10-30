@@ -558,6 +558,7 @@ for (const input of document.querySelectorAll(".camera-input")) {
     }
     $("review-photo").src = pendingPhoto.url;
     if (fromViewer) $("viewer").close(); // the review takes its place for a moment
+    if (input.closest("#day-sheet")) $("day-sheet").close();
     if (!$("review").open) $("review").showModal();
   });
 }
@@ -769,10 +770,15 @@ function renderMonth(year, month, today, withArrows = false) {
     cell.className = "day";
     cell.textContent = day;
 
-    if (key < startDate || key > today) {
+    if (key > today) {
       cell.classList.add("none");
       cell.disabled = true;
+      cell.setAttribute("aria-label", `${day}: not yet`);
+    } else if (key < startDate) {
+      // Before tracking started: tap to add an older photo
+      cell.classList.add("none");
       cell.setAttribute("aria-label", `${day}: not tracked`);
+      cell.addEventListener("click", () => openDaySheet(key));
     } else if (days.has(key)) {
       // A photo day: breakout, or clear if it was marked so
       const photos = days.get(key);
@@ -822,7 +828,7 @@ function renderMonth(year, month, today, withArrows = false) {
     const prev = section.querySelector(".prev");
     const next = section.querySelector(".next");
     const toToday = section.querySelector(".to-today");
-    prev.disabled = monthKey <= startDate.slice(0, 7);
+    prev.disabled = monthKey <= earliestMonth(today);
     next.disabled = monthKey >= today.slice(0, 7);
     toToday.disabled = monthKey === today.slice(0, 7);
     prev.addEventListener("click", () => moveMonth(-1));
@@ -838,6 +844,15 @@ function renderMonth(year, month, today, withArrows = false) {
 }
 
 let monthStep = 0; // -1 or 1 while a month change is animating in
+
+// How far back the month arrows go: the month tracking started, or a year
+// ago if that's earlier, so older photos can be added. e.g. "2025-10"
+function earliestMonth(today) {
+  const now = fromKey(today);
+  const yearAgo = toKey(new Date(now.getFullYear() - 1, now.getMonth(), 1)).slice(0, 7);
+  const start = startDate.slice(0, 7);
+  return start < yearAgo ? start : yearAgo;
+}
 
 function moveMonth(step) {
   const d = new Date(shownMonth.year, shownMonth.month + step, 1);
@@ -870,6 +885,10 @@ let sheetDate = null;
 function openDaySheet(date) {
   sheetDate = date;
   $("day-sheet-title").textContent = fromKey(date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  // Before tracking started there's nothing to tag yet, only a photo to add
+  const tracked = date >= startDate;
+  $("day-sheet-status").textContent = tracked ? "Clear day" : "Before you started tracking";
+  $("day-sheet-tags").hidden = !tracked;
   const state = stateForDay(date);
   renderTagPicker($("day-sheet-tags"), state, {
     withStatus: false,
@@ -888,10 +907,10 @@ function openDaySheet(date) {
 $("day-sheet-done").addEventListener("click", () => $("day-sheet").close());
 closeOnOutsideTap($("day-sheet"));
 
+// The photo picker opens by itself (the input is inside the button);
+// this just says which day the photo is for
 $("day-sheet-photo").addEventListener("click", () => {
-  $("day-sheet").close();
   nextPhotoDate = sheetDate;
-  $("calendar-camera").click();
 });
 
 // Photos | Lines switch. The choice is remembered on this phone.

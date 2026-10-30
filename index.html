@@ -221,10 +221,15 @@
   <!-- A day without photos: add tags or a photo -->
   <dialog id="day-sheet" class="sheet-dialog">
     <h2 id="day-sheet-title"></h2>
-    <p class="micro">Clear day</p>
+    <p class="micro" id="day-sheet-status">Clear day</p>
     <div class="tag-picker" id="day-sheet-tags"></div>
     <div class="dialog-buttons">
-      <button id="day-sheet-photo" class="button secondary">Add photo</button>
+      <!-- A real file input inside the button: iPhone only opens the photo
+           picker when you tap the input itself, not when code clicks it -->
+      <label class="button secondary" id="day-sheet-photo" tabindex="0" role="button">
+        Add photo
+        <input class="camera-input" type="file" accept="image/*" hidden>
+      </label>
       <button id="day-sheet-done" class="button primary" autofocus>Done</button>
     </div>
   </dialog>

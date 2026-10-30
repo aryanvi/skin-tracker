@@ -639,6 +639,11 @@ button.nav:disabled {
   opacity: .5;
 }
 
+/* Days before tracking started can be tapped to add an older photo */
+.day.none:not(:disabled) {
+  cursor: pointer;
+}
+
 .day.today {
   outline: 1.5px solid var(--ink);
   outline-offset: 2px;
